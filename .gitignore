@@ -1,0 +1,20 @@
+# secrets
+.env
+.env.*
+!.env.example
+venv/
+.venv/
+backups/
+*.err
+__pycache__/
+*.pyc
+**/uploads/**
+!**/uploads/**/
+!**/uploads/**/.gitkeep
+node_modules/
+dist/
+.DS_Store
+*.log
+.pytest_cache/
+.shots/
+.workbuddy/

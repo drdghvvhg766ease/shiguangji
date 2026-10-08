@@ -1,0 +1,29 @@
+{
+  "name": "shiguangji-frontend",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@tsparticles/engine": "^4.4.0",
+    "@tsparticles/vue3": "^4.4.0",
+    "axios": "^1.7.7",
+    "leaflet": "^1.9.4",
+    "lucide-vue-next": "^0.577.0",
+    "pinia": "^2.2.4",
+    "vue": "^3.5.12"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.1.4",
+    "vite": "^5.4.10"
+  },
+  "allowScripts": {
+    "@tsparticles/engine@4.4.0": true,
+    "esbuild@0.21.5": true,
+    "vue-demi@0.14.10": true
+  }
+}
