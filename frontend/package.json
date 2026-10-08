@@ -4,6 +4,7 @@
   "version": "1.0.0",
   "scripts": {
     "install:apps": "npm --prefix user install && npm --prefix admin install",
+    "ci:apps": "npm --prefix user ci && npm --prefix admin ci",
     "dev": "npm --prefix user run dev",
     "dev:admin": "npm --prefix admin run dev",
     "build": "npm run build:user && npm run build:admin",

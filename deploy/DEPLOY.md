@@ -12,13 +12,13 @@
 
 ## 步骤
 
-1. 上传代码，安装依赖：`python3 -m venv venv && venv/bin/pip install -r requirements.txt`
+1. 上传代码，进入 `backend/` 安装依赖：`python3 -m venv venv && venv/bin/pip install -r requirements.txt`
 2. 复制 `.env.example` 为 `.env`，填写 MySQL 密码与随机 `JWT_SECRET`
-3. 建库：`venv/bin/python seed.py`
-4. 在项目的 `frontend/` 目录执行 `npm run install:apps`、`npm run build`，将 `frontend/user/dist/` 上传到 `/var/www/shiguangji/dist`；管理端产物 `frontend/admin/dist/` 可另行配置独立 Nginx 站点托管
+3. 建库与建表：`venv/bin/python -c "from app.database import ensure_database, init_db; ensure_database(); init_db()"`；已有旧数据库先备份，再按根目录 README 的顺序执行迁移。`seed.py`、`seed_admin.py` 用于演示账号与数据初始化
+4. 在项目的 `frontend/` 目录执行 `npm run ci:apps`、`npm run build`，将 `frontend/user/dist/` 上传到 `/var/www/shiguangji/dist`；管理端产物 `frontend/admin/dist/` 可另行配置独立 Nginx 站点托管
 5. 放置 `deploy/nginx.conf`，`nginx -t && systemctl reload nginx`
 6. 放置 `deploy/shiguangji.service`，`systemctl enable --now shiguangji`
-7. 配 HTTPS 后：`.env` 中 `COOKIE_SECURE=true`，Nginx 监听 443
+7. 配 HTTPS 后：`.env` 中 `COOKIE_SECURE=true`，`ALLOWED_ORIGINS` 填写用户端与管理端的实际来源（逗号分隔），Nginx 监听 443
 8. 备份：`/var/lib/mysql` 或 `mysqldump` + `/data/shiguangji/uploads`
 
 ## 注意

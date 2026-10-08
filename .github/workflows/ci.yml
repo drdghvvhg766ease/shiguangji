@@ -1,0 +1,127 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  frontend:
+    name: Frontend build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: |
+            frontend/user/package-lock.json
+            frontend/admin/package-lock.json
+      - name: Install locked dependencies
+        run: npm run ci:apps
+      - name: Build user and admin apps
+        run: npm run build
+      - name: Upload frontend builds
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: |
+            frontend/user/dist
+            frontend/admin/dist
+          if-no-files-found: error
+          retention-days: 7
+
+  backend:
+    name: Backend integration tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      MYSQL_HOST: 127.0.0.1
+      MYSQL_PORT: '3306'
+      MYSQL_USER: root
+      MYSQL_PASSWORD: ci-mysql-password
+      MYSQL_DATABASE: shiguangji_ci
+      JWT_SECRET: ci-only-signing-key-for-disposable-test-data
+      API_BASE: http://127.0.0.1:8001
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: ci-mysql-password
+          MYSQL_ROOT_HOST: '%'
+          MYSQL_DATABASE: shiguangji_ci
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -pci-mysql-password --silent"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=12
+          --health-start-period=20s
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: backend/requirements*.txt
+      - name: Install dependencies
+        run: |
+          python -m pip install -r requirements-dev.txt
+          python -m pip check
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+      - name: Check Python syntax
+        run: python -m compileall -q app *.py
+      - name: Initialize isolated test database
+        run: |
+          python seed.py
+          python seed_admin.py
+      - name: Start API and run integration tests
+        run: |
+          python -m uvicorn app.main:app --host 127.0.0.1 --port 8001 > api-test.log 2>&1 &
+          api_pid=$!
+          trap 'kill "$api_pid" 2>/dev/null || true' EXIT
+          ready=false
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent --output /dev/null "$API_BASE/api/health"; then
+              ready=true
+              break
+            fi
+            if ! kill -0 "$api_pid" 2>/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+          if [ "$ready" != true ]; then
+            cat api-test.log
+            exit 1
+          fi
+          python -m pytest test_enhancements.py test_social.py -q --junitxml=test-results.xml
+      - name: Upload backend test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-test-results
+          path: |
+            backend/test-results.xml
+            backend/api-test.log
+          if-no-files-found: warn
+          retention-days: 7
