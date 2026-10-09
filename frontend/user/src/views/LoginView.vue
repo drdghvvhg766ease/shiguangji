@@ -1,11 +1,11 @@
 <template>
   <div class="login-image">
-    <div class="login-particles" aria-hidden="true">
-      <vue-particles
-        v-if="ready && particleCount > 0"
-        id="login-photo-particles"
-        :options="photoParticles"
-        style="height: 100%; width: 100%"
+    <div class="login-particles css-particles" aria-hidden="true">
+      <span
+        v-for="(d, i) in photoDots"
+        :key="'p' + i"
+        class="particle"
+        :style="dotStyle(d)"
       />
     </div>
     <div class="login-wordmark">
@@ -15,12 +15,12 @@
   </div>
 
   <div class="login-form-wrap">
-    <div class="login-particles" aria-hidden="true">
-      <vue-particles
-        v-if="ready && particleCount > 0"
-        id="login-form-particles"
-        :options="formParticles"
-        style="height: 100%; width: 100%"
+    <div class="login-particles css-particles" aria-hidden="true">
+      <span
+        v-for="(d, i) in formDots"
+        :key="'f' + i"
+        class="particle"
+        :style="dotStyle(d)"
       />
     </div>
 
@@ -100,42 +100,45 @@ const password = ref('')
 const nickname = ref('')
 const loading = ref(false)
 const error = ref('')
-const ready = ref(false)
-const particleCount = ref(0)
+const photoDots = ref([])
+const formDots = ref([])
 
-function buildOptions(count, speed, direction) {
-  return {
-    fullScreen: { enable: false },
-    detectRetina: true,
-    particles: {
-      number: { value: count, density: { enable: true, width: 1280, height: 800 } },
-      color: { value: ['#d76b50', '#81b29a', '#d9ab59', '#ffffff'] },
-      shape: { type: ['square', 'circle'] },
-      opacity: { value: { min: 0.2, max: 0.55 } },
-      size: { value: { min: 1, max: 3.5 } },
-      move: {
-        enable: count > 0,
-        speed,
-        direction,
-        straight: false,
-        outModes: { default: 'out' },
-      },
-      rotate: { value: { min: 0, max: 360 }, animation: { enable: true, speed: 3 } },
-    },
-    background: { color: 'transparent' },
-  }
+const PARTICLE_COLORS = ['#d76b50', '#81b29a', '#d9ab59', '#ffffff']
+
+function makeDots(count) {
+  return Array.from({ length: count }, () => ({
+    left: Math.random() * 100,
+    bottom: Math.random() * 35,
+    size: 1 + Math.random() * 2.5,
+    duration: 12 + Math.random() * 14,
+    delay: -Math.random() * 20,
+    drift: Math.random() * 60 - 30,
+    color: PARTICLE_COLORS[Math.floor(Math.random() * PARTICLE_COLORS.length)],
+    peak: 0.25 + Math.random() * 0.35,
+  }))
 }
 
-const photoParticles = ref(buildOptions(24, 0.35, 'bottom'))
-const formParticles = ref(buildOptions(18, 0.25, 'top'))
+function dotStyle(d) {
+  return {
+    left: d.left + '%',
+    bottom: d.bottom + '%',
+    width: d.size + 'px',
+    height: d.size + 'px',
+    background: d.color,
+    color: d.color,
+    animationDuration: d.duration + 's',
+    animationDelay: d.delay + 's',
+    '--drift': d.drift + 'px',
+    '--peak': d.peak,
+  }
+}
 
 function applyPrefs() {
   const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
   const mobile = window.innerWidth < 650
-  particleCount.value = reduce ? 0 : mobile ? 12 : 24
-  photoParticles.value = buildOptions(particleCount.value, 0.35, 'bottom')
-  formParticles.value = buildOptions(Math.max(8, particleCount.value - 6), 0.25, 'top')
-  ready.value = true
+  const n = reduce ? 0 : mobile ? 12 : 24
+  photoDots.value = makeDots(n)
+  formDots.value = makeDots(Math.max(8, n - 6))
 }
 
 onMounted(() => {
