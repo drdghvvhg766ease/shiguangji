@@ -38,9 +38,6 @@
             <Trash2 :size="16" />删除分册
           </button>
         </div>
-        <span class="eyebrow">{{
-          lines.find((l) => l.id === album.line_id)?.title || '汇总主线'
-        }}</span>
       </div>
       <div class="album-detail-cover" :class="coverClass">
         <img
@@ -176,13 +173,6 @@
               >接力题目<input
                 v-model="manageForm.prompt"
                 maxlength="200" /></label
-            ><label
-              >归属时间线<select v-model="manageForm.line_id">
-                <option :value="null">汇总主线</option>
-                <option v-for="l in lines" :key="l.id" :value="l.id">
-                  {{ l.title }}
-                </option>
-              </select></label
             >
             <p v-if="manageError" class="error-message">{{ manageError }}</p>
             <button class="primary" :disabled="managing">

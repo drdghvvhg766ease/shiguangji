@@ -111,15 +111,6 @@
           </select>
         </div>
         <div class="form-group">
-          <label for="memory-line">时间线</label
-          ><select id="memory-line" v-model="lineId" :disabled="!!albumLine">
-            <option :value="null">汇总主线</option>
-            <option v-for="line in lines" :key="line.id" :value="line.id">
-              {{ line.title }}
-            </option>
-          </select>
-        </div>
-        <div class="form-group">
           <button
             class="text-button"
             type="button"

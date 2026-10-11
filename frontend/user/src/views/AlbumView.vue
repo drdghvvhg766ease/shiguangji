@@ -141,15 +141,6 @@
               maxlength="200"
             />
           </div>
-          <div class="form-group">
-            <label for="new-album-line">归属时间线</label
-            ><select id="new-album-line" v-model="form.line_id">
-              <option :value="null">汇总主线</option>
-              <option v-for="line in lines" :key="line.id" :value="line.id">
-                {{ line.title }}
-              </option>
-            </select>
-          </div>
           <p v-if="createError" class="error-message">{{ createError }}</p>
           <div class="flow-footer">
             <button

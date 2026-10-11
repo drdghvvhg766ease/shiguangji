@@ -150,17 +150,6 @@
                     {{ a.title }}
                   </option>
                 </select></label
-              ><label
-                >时间线<select
-                  v-model="editForm.line_id"
-                  aria-label="时间线"
-                  :disabled="!!selectedAlbumLine"
-                >
-                  <option :value="null">汇总主线</option>
-                  <option v-for="line in lines" :key="line.id" :value="line.id">
-                    {{ line.title }}
-                  </option>
-                </select></label
               ><FootprintMap picking v-model="editLocation" /><button
                 class="primary"
                 :disabled="busy"

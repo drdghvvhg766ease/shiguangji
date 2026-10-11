@@ -24,73 +24,136 @@
       />
     </div>
 
-    <form class="login-form" @submit.prevent="submit">
+    <form class="login-form" :class="{ shake: shaking }" @submit.prevent="submit" novalidate>
       <div class="brand">
         <span class="brand-mark">迹</span>
         <span class="brand-name">时光迹</span>
       </div>
 
-      <template v-if="mode === 'login'">
-        <h1>欢迎回来</h1>
-        <p>继续看看朋友们留下的生活片段。</p>
-        <div class="form-group">
-          <label for="login-name">用户名</label>
-          <input id="login-name" v-model="username" placeholder="请输入用户名" autocomplete="username" required />
-        </div>
-        <div class="form-group">
-          <label for="login-password">密码</label>
-          <input
-            id="login-password"
-            v-model="password"
-            type="password"
-            placeholder="请输入密码"
-            autocomplete="current-password"
-            required
-          />
-        </div>
-        <button class="primary" type="submit" :disabled="loading">
-          {{ loading ? '请稍候…' : '登录' }}
-        </button>
-        <div class="login-register">
-          还没有账号？
-          <button type="button" @click="mode = 'register'">创建账号</button>
-        </div>
-      </template>
+      <div :key="mode" class="mode-pane">
+        <template v-if="mode === 'login'">
+          <h1>欢迎回来</h1>
+          <p>继续看看朋友们留下的生活片段。</p>
+          <div class="form-group">
+            <label for="login-name">用户名</label>
+            <input
+              ref="nameInput"
+              id="login-name"
+              v-model="username"
+              placeholder="请输入用户名"
+              autocomplete="username"
+              required
+            />
+          </div>
+          <div class="form-group">
+            <label for="login-password">密码</label>
+            <div class="password-input">
+              <input
+                id="login-password"
+                v-model="password"
+                :type="showPassword ? 'text' : 'password'"
+                placeholder="请输入密码"
+                autocomplete="current-password"
+                required
+              />
+              <button
+                type="button"
+                class="password-toggle"
+                :aria-label="showPassword ? '隐藏密码' : '显示密码'"
+                :title="showPassword ? '隐藏密码' : '显示密码'"
+                tabindex="-1"
+                @click="showPassword = !showPassword"
+              >
+                <svg v-if="!showPassword" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                  <circle cx="12" cy="12" r="3" />
+                </svg>
+                <svg v-else viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+                  <line x1="1" y1="1" x2="23" y2="23" />
+                </svg>
+              </button>
+            </div>
+          </div>
+          <button class="primary" type="submit" :disabled="loading">
+            <span v-if="loading" class="spinner" aria-hidden="true"></span>
+            {{ loading ? '请稍候…' : '登录' }}
+          </button>
+          <div class="login-register">
+            还没有账号？
+            <button type="button" @click="switchMode('register')">创建账号</button>
+          </div>
+        </template>
 
-      <template v-else>
-        <h1>创建账号</h1>
-        <p>和朋友一起，把日子留下来。</p>
-        <div class="form-group">
-          <label for="reg-name">用户名</label>
-          <input id="reg-name" v-model="username" placeholder="至少 3 个字符" required minlength="3" />
-        </div>
-        <div class="form-group">
-          <label for="reg-nick">昵称</label>
-          <input id="reg-nick" v-model="nickname" placeholder="朋友怎么称呼你" />
-        </div>
-        <div class="form-group">
-          <label for="reg-pass">密码</label>
-          <input id="reg-pass" v-model="password" type="password" placeholder="至少 6 位" required minlength="6" />
-        </div>
-        <button class="primary" type="submit" :disabled="loading">
-          {{ loading ? '请稍候…' : '注册并进入' }}
-        </button>
-        <div class="login-register">
-          已有账号？
-          <button type="button" @click="mode = 'login'">去登录</button>
-        </div>
-      </template>
+        <template v-else>
+          <h1>创建账号</h1>
+          <p>和朋友一起，把日子留下来。</p>
+          <div class="form-group">
+            <label for="reg-name">用户名</label>
+            <input
+              ref="nameInput"
+              id="reg-name"
+              v-model="username"
+              placeholder="至少 3 个字符"
+              autocomplete="username"
+              required
+              minlength="3"
+            />
+          </div>
+          <div class="form-group">
+            <label for="reg-nick">昵称</label>
+            <input id="reg-nick" v-model="nickname" placeholder="朋友怎么称呼你" autocomplete="nickname" />
+          </div>
+          <div class="form-group">
+            <label for="reg-pass">密码</label>
+            <div class="password-input">
+              <input
+                id="reg-pass"
+                v-model="password"
+                :type="showPassword ? 'text' : 'password'"
+                placeholder="至少 6 位"
+                autocomplete="new-password"
+                required
+                minlength="6"
+              />
+              <button
+                type="button"
+                class="password-toggle"
+                :aria-label="showPassword ? '隐藏密码' : '显示密码'"
+                :title="showPassword ? '隐藏密码' : '显示密码'"
+                tabindex="-1"
+                @click="showPassword = !showPassword"
+              >
+                <svg v-if="!showPassword" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M1 12s4-8 11-8 11-8 11 8-4 8-11 8-11-8-11-8z" />
+                  <circle cx="12" cy="12" r="3" />
+                </svg>
+                <svg v-else viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+                  <line x1="1" y1="1" x2="23" y2="23" />
+                </svg>
+              </button>
+            </div>
+          </div>
+          <button class="primary" type="submit" :disabled="loading">
+            <span v-if="loading" class="spinner" aria-hidden="true"></span>
+            {{ loading ? '请稍候…' : '注册并进入' }}
+          </button>
+          <div class="login-register">
+            已有账号？
+            <button type="button" @click="switchMode('login')">去登录</button>
+          </div>
+        </template>
+      </div>
 
-      <p v-if="error" style="color: var(--terracotta-dark); font-size: 12px; margin-top: 12px">{{ error }}</p>
-      <p style="color: var(--muted); font-size: 11px; margin-top: 18px">
-        演示：demo_a / demo1234 · demo_b / demo1234
-      </p>
+      <p v-if="error" class="form-error">{{ error }}</p>
+      <p class="demo-hint">演示：demo_a / demo1234 · demo_b / demo1234</p>
     </form>
   </div>
 </template>
 
 <script setup>
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, nextTick } from 'vue'
 import { useAuthStore } from '../stores/auth'
 
 const auth = useAuthStore()
@@ -100,6 +163,9 @@ const password = ref('')
 const nickname = ref('')
 const loading = ref(false)
 const error = ref('')
+const showPassword = ref(false)
+const shaking = ref(false)
+const nameInput = ref(null)
 const photoDots = ref([])
 const formDots = ref([])
 
@@ -141,13 +207,33 @@ function applyPrefs() {
   formDots.value = makeDots(Math.max(8, n - 6))
 }
 
+function switchMode(target) {
+  if (target === mode.value || loading.value) return
+  mode.value = target
+  showPassword.value = false
+  error.value = ''
+  nextTick(() => nameInput.value?.focus({ preventScroll: true }))
+}
+
+let shakeTimer = null
+function triggerShake() {
+  shaking.value = false
+  nextTick(() => {
+    shaking.value = true
+    clearTimeout(shakeTimer)
+    shakeTimer = setTimeout(() => (shaking.value = false), 520)
+  })
+}
+
 onMounted(() => {
   applyPrefs()
   window.addEventListener('resize', applyPrefs)
   window.matchMedia('(prefers-reduced-motion: reduce)').addEventListener('change', applyPrefs)
+  nextTick(() => nameInput.value?.focus({ preventScroll: true }))
 })
 
 async function submit() {
+  if (loading.value) return
   loading.value = true
   error.value = ''
   try {
@@ -158,6 +244,7 @@ async function submit() {
     }
   } catch (e) {
     error.value = e.userMessage || '操作失败'
+    triggerShake()
   } finally {
     loading.value = false
   }

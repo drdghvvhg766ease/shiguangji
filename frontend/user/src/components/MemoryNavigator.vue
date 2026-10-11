@@ -58,6 +58,7 @@
       ref="strip"
       class="memory-strip"
       aria-label="照片胶片导航"
+      @mouseleave="preview = null"
     >
       <button
         v-for="p in posts"
@@ -68,12 +69,27 @@
         :aria-label="`定位 ${p.event_date} ${p.nickname || p.username} 的记录`"
         :title="`${p.event_date} · ${p.content || '这一刻'}`"
         @click="emit('navigate', p.id)"
+        @mouseenter="showPreview(p, $event)"
+        @focus="showPreview(p)"
       >
         <MediaPreview v-if="p.media.length" :media="p.media[0]" />
         <span v-else class="memory-text-preview"><PenLine :size="20" /></span>
         <small>{{ p.event_date.slice(5).replace('-', '/') }}</small>
       </button>
     </nav>
+    <Teleport to="body">
+      <Transition name="memory-peek">
+        <figure
+          v-if="preview"
+          class="memory-peek"
+          :style="{ left: `${preview.x}px`, top: `${preview.y}px` }"
+          aria-hidden="true"
+        >
+          <img :src="preview.src" :alt="preview.alt" decoding="async" />
+          <figcaption>{{ preview.caption }}</figcaption>
+        </figure>
+      </Transition>
+    </Teleport>
     <div class="memory-progress" aria-hidden="true">
       <span :style="{ width: `${((index + 1) / posts.length) * 100}%` }" />
     </div>
@@ -96,7 +112,8 @@ const props = defineProps({
 })
 const emit = defineEmits(['navigate', 'open'])
 const strip = ref(null),
-  expanded = ref(true)
+  expanded = ref(false),
+  preview = ref(null)
 const index = computed(() =>
   Math.max(
     0,
@@ -104,6 +121,23 @@ const index = computed(() =>
   ),
 )
 const current = computed(() => props.posts[index.value])
+function showPreview(p, event) {
+  const media = p.media[0]
+  if (!media || media.kind !== 'photo') {
+    preview.value = null
+    return
+  }
+  const box = event?.currentTarget?.getBoundingClientRect()
+  const x = event?.clientX ?? (box ? box.left + box.width / 2 : 0)
+  const y = box ? box.top : 0
+  preview.value = {
+    src: media.preview_url || media.original_url,
+    alt: p.content || '',
+    caption: `${p.event_date} · ${p.nickname || p.username}`,
+    x: Math.min(Math.max(x, 190), window.innerWidth - 190),
+    y: Math.max(y, 200),
+  }
+}
 function step(delta) {
   const post = props.posts[index.value + delta]
   if (post) emit('navigate', post.id)

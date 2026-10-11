@@ -73,7 +73,7 @@ async function main(){
     await page.setViewportSize({width:390,height:844})
     await page.waitForTimeout(350)
     assert(await page.evaluate(()=>window.scrollY===0),'root scroll must remain locked')
-    assert(await page.locator('.footprint-map').evaluate(el=>{const frame=el.getBoundingClientRect();return [...el.querySelectorAll('.leaflet-overlay-pane path')].every(path=>{const b=path.getBoundingClientRect();return b.left>=frame.left-2&&b.right<=frame.right+2&&b.top>=frame.top-2&&b.bottom<=frame.bottom+2})}),'all map boundaries and footprints must fit on mobile')
+    assert(await page.locator('.footprint-map').evaluate(el=>{const frame=el.getBoundingClientRect();return [...el.querySelectorAll('.atlas-province,.atlas-city-core')].every(path=>{const b=path.getBoundingClientRect();return b.left>=frame.left-2&&b.right<=frame.right+2&&b.top>=frame.top-2&&b.bottom<=frame.bottom+2})}),'all map boundaries and footprints must fit on mobile')
     await page.screenshot({path:path.join(shots,'2026-10-01-map-footprints-mobile.png')})
     await page.setViewportSize({width:1440,height:960})
     await json(await adminContext.request.post(adminBase+'/api/admin/auth/login',{data:{username:'admin',password:'admin123'}}))

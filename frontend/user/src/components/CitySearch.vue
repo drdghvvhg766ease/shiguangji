@@ -71,11 +71,12 @@
               ><strong>{{ city.name }}</strong
               ><small>{{ city.province }}</small></span
             >
+            <em v-if="city.level === 'county'" class="city-level">县/区</em>
             <Check v-if="modelValue?.location_name === city.name" :size="15" />
           </button>
         </div>
         <p v-if="!matches.length" class="city-search-status" role="status">
-          没有匹配城市
+          没有找到「{{ query.trim() }}」。可以直接在地图上点选该地点，或换个名称再搜。
         </p>
         <button
           v-if="visible.length < matches.length"
@@ -83,7 +84,7 @@
           class="text-button city-more"
           @click="limit += 40"
         >
-          显示更多
+          显示更多（{{ matches.length - visible.length }}）
         </button>
       </template>
     </div>
@@ -116,9 +117,31 @@ const loading = ref(true),
   input = ref(null),
   list = ref(null)
 const matches = computed(() => {
-  const terms = query.value.trim().split(/\s+/).filter(Boolean)
-  return cities.value.filter((c) =>
+  const q = query.value.trim()
+  const terms = q.split(/\s+/).filter(Boolean)
+  if (!terms.length) return cities.value
+  const hit = cities.value.filter((c) =>
     terms.every((term) => `${c.province} ${c.name}`.includes(term)),
+  )
+  if (!q) return hit
+  // 相关性排序：完全同名 → 以关键词开头 → 名称包含 → 仅省份匹配
+  // 同分时地级市优先于县级，避免大量区县把主要城市挤到后面
+  const score = (c) => {
+    const name = c.name
+    const prov = c.province
+    if (name === q) return 0
+    if (name.startsWith(q)) return 1
+    if (prov === q || prov.startsWith(q)) return 2
+    if (name.includes(q)) return 3
+    if (prov.includes(q)) return 4
+    return 5
+  }
+  return hit.sort(
+    (a, b) =>
+      score(a) - score(b) ||
+      Number(b.level === 'city') - Number(a.level === 'city') ||
+      a.name.length - b.name.length ||
+      a.name.localeCompare(b.name, 'zh'),
   )
 })
 const visible = computed(() => matches.value.slice(0, limit.value))
@@ -182,9 +205,17 @@ async function load() {
     if (!response.ok) throw new Error()
     const data = await response.json()
     if (request !== controller) return
-    cities.value = data.cities
+    // 索引文件使用缩写字段以减小体积，这里还原
+    cities.value = data.cities.map((c) => ({
+      code: c.c,
+      name: c.n,
+      province: c.p,
+      latitude: c.a,
+      longitude: c.l,
+      level: c.t ? 'county' : 'city',
+    }))
   } catch (e) {
-    if (e.name !== 'AbortError') error.value = '城市加载失败'
+    if (e.name !== 'AbortError') error.value = '地点加载失败'
   } finally {
     if (request === controller) loading.value = false
   }

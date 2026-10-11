@@ -14,12 +14,56 @@
           {{ auth.currentCircle?.name || '圈子生活' }}
         </p>
       </div>
-      <select v-model="year" class="field-select" aria-label="选择年份">
-        <option value="all">全部年份</option>
-        <option v-for="y in years" :key="y" :value="y">{{ y }} 年</option>
-      </select>
+      <div
+        v-if="years.length"
+        class="year-pills"
+        role="group"
+        aria-label="选择年份"
+      >
+        <button
+          type="button"
+          :class="{ active: year === 'all' }"
+          @click="year = 'all'"
+        >
+          全部</button
+        ><button
+          v-for="y in years"
+          :key="y"
+          type="button"
+          :class="{ active: year === y }"
+          @click="year = y"
+        >
+          {{ y }}
+        </button>
+      </div>
     </div>
+    <dl v-if="!loading && !error && filtered.length" class="chronicle-stats">
+      <div>
+        <dt>记录</dt>
+        <dd>{{ total }}</dd>
+      </div>
+      <div>
+        <dt>影像</dt>
+        <dd>{{ mediaCount }}</dd>
+      </div>
+      <div>
+        <dt>地点</dt>
+        <dd>{{ placeCount }}</dd>
+      </div>
+      <div>
+        <dt>月份</dt>
+        <dd>{{ filtered.length }}</dd>
+      </div>
+      <div>
+        <dt>评论</dt>
+        <dd>{{ commentCount }}</dd>
+      </div>
+    </dl>
     <div class="line-toolbar">
+      <div v-if="mode === 'map' && years.length" class="year-pills" role="group" aria-label="筛选足迹年份">
+        <button type="button" :class="{ active: year === 'all' }" @click="year = 'all'">全部年份</button>
+        <button v-for="mapYear in years" :key="mapYear" type="button" :class="{ active: year === mapYear }" @click="year = mapYear">{{ mapYear }}</button>
+      </div>
       <div class="segmented">
         <button
           :class="{ active: mode === 'stories' }"
@@ -30,61 +74,18 @@
           <MapPin :size="15" />足迹地图
         </button>
       </div>
-      <div>
-        <button
-          v-if="canManage"
-          class="icon-button"
-          title="编辑时间线"
-          aria-label="编辑时间线"
-          @click="editLine"
-        >
-          <Pencil :size="17" /></button
-        ><button
-          v-if="canManage"
-          class="icon-button"
-          title="删除时间线"
-          aria-label="删除时间线"
-          @click="removeLine"
-        >
-          <Trash2 :size="17" /></button
-        ><button
-          class="text-button"
-          :disabled="!auth.currentCircleId"
-          @click="newLine"
-        >
-          <Plus :size="17" />新建时间线
-        </button>
-      </div>
     </div>
-    <nav class="line-tree" aria-label="主线与分支">
-      <button
-        :class="{ active: selectedLine === null }"
-        @click="selectedLine = null"
-      >
-        汇总主线<small>{{ allCount }}</small></button
-      ><button
-        v-for="line in orderedLines"
-        :key="line.id"
-        :class="{ active: selectedLine === line.id }"
-        @click="selectedLine = line.id"
-      >
-        <GitBranch :size="15" />{{ line.depth ? '↳ ' : '' }}{{ line.title
-        }}<small>{{ line.album_count }} 本分册</small>
-      </button>
-    </nav>
-    <p v-if="currentLine" class="line-description">
-      {{ parentLabel }} / {{ currentLine.title }} ·
-      {{ kindLabels[currentLine.kind] }}
-    </p>
     <FootprintMap
       v-if="mode === 'map' && !loading && !error"
       :posts="mapPosts"
+      :user-id="auth.user?.id"
       @open-post="$emit('open-post', $event)"
     />
     <div
       v-if="mode === 'stories' && filtered.length && !error && !loading"
       ref="navigation"
       class="chronicle-navigation"
+      :class="{ 'is-compact': compactNav }"
     >
       <nav class="month-nav" aria-label="月份导航">
         <button
@@ -112,32 +113,88 @@
       <button class="outline" @click="load">重试</button>
     </div>
     <template v-else-if="mode === 'stories'"
-      ><section
-        v-for="m in filtered"
-        :key="key(m)"
-        :data-month="key(m)"
-        class="month-chapter"
-      >
+      ><template v-for="m in filtered" :key="key(m)"
+        ><aside
+          v-if="m.firstOfYear && recapOf(m.year)"
+          class="year-recap"
+          :aria-label="`${m.year} 年度回顾`"
+        >
+          <div class="recap-year">
+            <span class="recap-en">{{ m.year }} · recap</span>
+            <strong>{{ m.year }}</strong>
+            <small>{{ recapOf(m.year)?.summary }}</small>
+          </div>
+          <dl class="recap-stats">
+            <div>
+              <dt>记录</dt>
+              <dd>{{ recapOf(m.year)?.posts }}</dd>
+            </div>
+            <div>
+              <dt>照片</dt>
+              <dd>{{ recapOf(m.year)?.photos }}</dd>
+            </div>
+            <div>
+              <dt>城市</dt>
+              <dd>{{ recapOf(m.year)?.places }}</dd>
+            </div>
+            <div>
+              <dt>同行</dt>
+              <dd>{{ recapOf(m.year)?.people }}</dd>
+            </div>
+            <div>
+              <dt>最长连续</dt>
+              <dd>
+                {{ recapOf(m.year)?.longest
+                }}<small>天</small>
+              </dd>
+            </div>
+          </dl>
+        </aside>
+        <section
+          class="month-chapter"
+          :data-month="key(m)"
+        >
         <header class="chapter-heading">
-          <div>
-            <span class="chapter-number">{{
-              String(m.month).padStart(2, '0')
-            }}</span>
+          <span class="chapter-number">{{
+            String(m.month).padStart(2, '0')
+          }}</span>
+          <div class="chapter-title">
+            <span class="chapter-en"
+              >{{ monthEn[m.month - 1] }} · {{ m.year }}</span
+            >
             <h2>
-              {{ m.year
-              }}<small
-                >{{ monthNames[m.month - 1] }} ·
-                {{ m.post_count }} 条记录</small
-              >
+              {{ monthNames[m.month - 1]
+              }}<small>{{ m.post_count }} 条记录 · {{ m.days.length }} 天</small>
             </h2>
           </div>
+          <ul class="chapter-meta">
+            <li v-if="m.photos">
+              <ImageIcon :size="13" />{{ m.photos }} 张照片
+            </li>
+            <li v-if="m.videos"><Film :size="13" />{{ m.videos }} 段视频</li>
+            <li v-if="m.places.length">
+              <MapPin :size="13" />{{ m.places.length }} 个地点
+            </li>
+          </ul>
           <span class="chapter-line"></span>
         </header>
         <div v-for="d in m.days" :key="d.event_date" class="chronicle-day">
           <div class="chronicle-date">
+            <span class="date-node"></span>
+            <em>{{ monthEn[m.month - 1].slice(0, 3) }}</em>
             <strong>{{ Number(d.event_date.slice(8)) }}</strong
             ><span>{{ weekday(d.event_date) }}</span
-            ><small>{{ d.posts.length }} 条记录</small>
+            >            <span v-if="termName(d.event_date)" class="date-term">{{
+              termName(d.event_date)
+            }}</span>
+            <span class="date-counts">
+              <small>{{ d.posts.length }} 条记录</small>
+              <span
+                v-if="streakOf(d.event_date) > 1"
+                class="streak-badge"
+                >连续 {{ streakOf(d.event_date) }} 天</span
+              >
+            </span>
           </div>
           <div class="day-stories">
             <article
@@ -155,10 +212,15 @@
                 v-if="p.media.length"
                 class="chronicle-images"
                 :class="{
-                  multiple: p.media.length > 1,
-                  three: p.media.length > 2,
+                  pair: p.media.length === 2,
+                  triple: p.media.length > 2,
                 }"
               >
+                <span
+                  v-if="p.id === featured(m)"
+                  class="featured-flag"
+                  aria-hidden="true">本月精选</span
+                >
                 <button
                   v-for="(media, i) in p.media.slice(0, 3)"
                   :key="media.id"
@@ -174,31 +236,33 @@
               </div>
               <div class="chronicle-copy">
                 <div class="story-byline">
-                  <span
-                    ><span class="author-dot"></span
-                    >{{ p.nickname || p.username }}</span
-                  ><span
-                    >{{ p.activity_tag || '日常' }} ·
-                    {{
-                      p.media[0]?.kind === 'video'
-                        ? '视频'
-                        : `${p.media.length} 张照片`
+                  <span class="story-author"
+                    ><UserAvatar :name="p.nickname || p.username" />{{
+                      p.nickname || p.username
                     }}</span
-                  >
+                  ><span class="story-tags">
+                    <span class="story-tag">{{ p.activity_tag || '日常' }}</span>
+                    <span v-if="p.location_name" class="story-tag place">
+                      <MapPin :size="11" />{{ p.location_name }}
+                    </span>
+                  </span>
                 </div>
                 <p>{{ p.content || '这一刻，没有文字。' }}</p>
-                <button
-                  class="text-button"
-                  title="查看记录与评论"
-                  @click="open(p, p.media[0], $event, true)"
-                >
-                  <MessageCircle :size="16" />{{ p.comment_count
-                  }}<ArrowUpRight :size="16" />
-                </button>
+                <div class="story-foot">
+                  <button
+                    class="text-button"
+                    title="查看记录与评论"
+                    @click="open(p, p.media[0], $event, true)"
+                  >
+                    <MessageCircle :size="16" />{{ p.comment_count
+                    }}<ArrowUpRight :size="16" />
+                  </button>
+                  <time v-if="timeLabel(p)">{{ timeLabel(p) }}</time>
+                </div>
               </div>
             </article>
           </div>
-        </div></section
+        </div></section></template
     ></template>
     <div v-if="!loading && !error && !filtered.length" class="empty-state">
       {{
@@ -208,78 +272,7 @@
       }}
     </div>
     <div v-if="!loading && !error && filtered.length" class="collection-end">
-      <span></span>每一天，都有迹可循。<span></span>
-    </div>
-    <div
-      v-if="lineModal"
-      v-dialog="() => (lineModal = false)"
-      class="modal open"
-      @click.self="lineModal = false"
-    >
-      <form class="modal-card narrow" @submit.prevent="saveLine">
-        <div class="modal-head">
-          <strong>{{ editingLine ? '编辑时间线' : '新建时间线' }}</strong
-          ><button
-            type="button"
-            class="icon-button"
-            title="关闭"
-            aria-label="关闭"
-            @click="lineModal = false"
-          >
-            <X />
-          </button>
-        </div>
-        <div class="line-form">
-          <label
-            >名称<input
-              v-model="lineForm.title"
-              required
-              maxlength="64"
-              placeholder="例如：我们的云南之旅" /></label
-          ><label
-            >类型<select v-model="lineForm.kind" aria-label="时间线类型">
-              <option
-                v-for="(label, value) in kindLabels"
-                :key="value"
-                :value="value"
-              >
-                {{ label }}
-              </option>
-            </select></label
-          ><label
-            >归属主线<select v-model="lineForm.parent_id">
-              <option :value="null">汇总主线</option>
-              <option
-                v-for="line in parentOptions"
-                :key="line.id"
-                :value="line.id"
-              >
-                {{ line.title }}
-              </option>
-            </select></label
-          >
-          <fieldset class="album-checkboxes">
-            <legend>关联分册</legend>
-            <label v-for="a in editableAlbums" :key="a.id"
-              ><input
-                v-model="lineForm.albumIds"
-                type="checkbox"
-                :value="a.id"
-              />{{ a.title }}</label
-            >
-            <p v-if="!editableAlbums.length" class="muted">
-              还没有可关联的分册。
-            </p>
-          </fieldset>
-          <p v-if="lineError" class="error-message">{{ lineError }}</p>
-          <button
-            class="primary"
-            :disabled="lineBusy || !lineForm.title.trim()"
-          >
-            {{ lineBusy ? '保存中…' : '保存时间线' }}
-          </button>
-        </div>
-      </form>
+      <span></span><i class="end-seal">迹</i>每一天，都有迹可循。<span></span>
     </div>
   </section>
 </template>
@@ -291,26 +284,23 @@ import {
   onActivated,
   onBeforeUnmount,
   onDeactivated,
-  reactive,
   ref,
   watch,
 } from 'vue'
 import {
   ArrowUpRight,
-  GitBranch,
+  Film,
+  Image as ImageIcon,
   MapPin,
   MessageCircle,
-  Pencil,
-  Plus,
-  Trash2,
-  X,
 } from 'lucide-vue-next'
 import api from '../api'
 import { useAuthStore } from '../stores/auth'
 import MediaPreview from '../components/MediaPreview.vue'
 import FootprintMap from '../components/FootprintMap.vue'
 import MemoryNavigator from '../components/MemoryNavigator.vue'
-import { confirmDialog } from '../utils/confirm'
+import UserAvatar from '../components/UserAvatar.vue'
+import { solarTerm, streakInfo } from '../utils/calendar'
 const emit = defineEmits(['open-post'])
 const auth = useAuthStore(),
   revision = inject('revision')
@@ -322,73 +312,9 @@ const months = ref([]),
   error = ref('')
 const navigation = ref(null),
   navigationHeight = ref(0),
-  activePostId = ref(null)
-const lines = ref([]),
-  albums = ref([]),
-  selectedLine = ref(null),
-  mode = ref('stories'),
-  lineModal = ref(false),
-  editingLine = ref(null),
-  lineBusy = ref(false),
-  lineError = ref('')
-const lineForm = reactive({
-  title: '',
-  kind: 'life',
-  parent_id: null,
-  albumIds: [],
-})
-const kindLabels = {
-  life: '生活',
-  travel: '旅行',
-  graduation: '毕业',
-  other: '其他',
-}
-const currentLine = computed(() =>
-  lines.value.find((l) => l.id === selectedLine.value),
-)
-const canManage = computed(
-  () =>
-    currentLine.value &&
-    (currentLine.value.created_by === auth.user?.id || auth.canManage),
-)
-const parentLabel = computed(
-  () =>
-    lines.value.find((l) => l.id === currentLine.value?.parent_id)?.title ||
-    '汇总主线',
-)
-const allCount = computed(() =>
-  months.value.reduce((n, m) => n + m.post_count, 0),
-)
-const orderedLines = computed(() => {
-  const result = []
-  function walk(parent, depth) {
-    for (const line of lines.value.filter((l) => l.parent_id === parent)) {
-      result.push({ ...line, depth })
-      walk(line.id, depth + 1)
-    }
-  }
-  walk(null, 0)
-  return result
-})
-function children(id) {
-  const ids = new Set([id])
-  let size = -1
-  while (size !== ids.size) {
-    size = ids.size
-    lines.value.forEach((l) => {
-      if (ids.has(l.parent_id)) ids.add(l.id)
-    })
-  }
-  return ids
-}
-const parentOptions = computed(() =>
-  editingLine.value
-    ? orderedLines.value.filter((l) => !children(editingLine.value).has(l.id))
-    : orderedLines.value,
-)
-const editableAlbums = computed(() =>
-  albums.value.filter((a) => a.created_by === auth.user?.id || auth.canManage),
-)
+  activePostId = ref(null),
+  compactNav = ref(false)
+const mode = ref('stories')
 const monthNames = [
   '一月',
   '二月',
@@ -403,31 +329,101 @@ const monthNames = [
   '十一月',
   '十二月',
 ]
+const monthEn = [
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
+]
 const years = computed(() => [...new Set(months.value.map((m) => m.year))])
-const filtered = computed(() => {
-  const ids = selectedLine.value ? children(selectedLine.value) : null
-  return months.value
+const filtered = computed(() =>
+  months.value
     .filter((m) => year.value === 'all' || m.year === year.value)
-    .map((m) => {
-      const days = m.days
-        .map((d) => ({
-          ...d,
-          posts: d.posts.filter((p) => !ids || ids.has(p.line_id)),
-        }))
-        .filter((d) => d.posts.length)
+    .map((m, index, list) => {
+      const posts = m.days.flatMap((d) => d.posts)
       return {
         ...m,
-        days,
-        post_count: days.reduce((n, d) => n + d.posts.length, 0),
+        firstOfYear: list.findIndex((x) => x.year === m.year) === index,
+        post_count: posts.length,
+        photos: posts.reduce(
+          (n, p) => n + p.media.filter((x) => x.kind === 'photo').length,
+          0,
+        ),
+        videos: posts.reduce(
+          (n, p) => n + p.media.filter((x) => x.kind === 'video').length,
+          0,
+        ),
+        places: [...new Set(posts.map((p) => p.location_name).filter(Boolean))],
       }
     })
-    .filter((m) => m.days.length)
+    .filter((m) => m.days.length),
+)
+const recaps = computed(() => {
+  const buckets = new Map()
+  for (const m of filtered.value) {
+    if (!buckets.has(m.year))
+      buckets.set(m.year, {
+        year: m.year,
+        posts: 0,
+        photos: 0,
+        videos: 0,
+        days: 0,
+        places: new Set(),
+        people: new Set(),
+        dates: [],
+      })
+    const r = buckets.get(m.year)
+    for (const d of m.days) {
+      r.dates.push(d.event_date)
+      r.days += 1
+      r.posts += d.posts.length
+      for (const p of d.posts) {
+        r.photos += p.media.filter((x) => x.kind === 'photo').length
+        r.videos += p.media.filter((x) => x.kind === 'video').length
+        if (p.location_name) r.places.add(p.location_name)
+        r.people.add(p.user_id)
+      }
+    }
+  }
+  return [...buckets.values()].map((r) => {
+    const { longest } = streakInfo(r.dates)
+    const bits = [`${r.days} 天里有记录`, `${r.photos + r.videos} 个影像`]
+    if (r.places.size) bits.push(`${r.places.size} 个地方`)
+    if (longest > 1) bits.push(`最长连续 ${longest} 天`)
+    return {
+      year: r.year,
+      posts: r.posts,
+      photos: r.photos + r.videos,
+      places: r.places.size,
+      people: r.people.size,
+      longest,
+      summary: bits.join(' · '),
+    }
+  })
 })
+const recapOf = (y) => recaps.value.find((r) => r.year === y)
 const mapPosts = computed(() =>
   filtered.value.flatMap((m) => m.days.flatMap((d) => d.posts)),
 )
 const total = computed(() =>
   filtered.value.reduce((n, m) => n + m.post_count, 0),
+)
+const mediaCount = computed(() =>
+  mapPosts.value.reduce((n, p) => n + p.media.length, 0),
+)
+const placeCount = computed(
+  () => new Set(mapPosts.value.map((p) => p.location_name).filter(Boolean)).size,
+)
+const commentCount = computed(() =>
+  mapPosts.value.reduce((n, p) => n + p.comment_count, 0),
 )
 const key = (m) => `${m.year}-${m.month}`
 const featured = (m) =>
@@ -438,6 +434,44 @@ const weekday = (s) =>
   new Intl.DateTimeFormat('zh-CN', { weekday: 'short' }).format(
     new Date(`${s}T12:00:00`),
   )
+const termName = (s) => solarTerm(s)?.name || ''
+const streaks = computed(() => streakInfo(mapPosts.value.map((p) => p.event_date)))
+const streakOf = (s) => streaks.value.map[s] || 0
+function step(delta) {
+  const list = mapPosts.value
+  if (!list.length) return
+  const at = list.findIndex((p) => p.id === activePostId.value)
+  const next =
+    at < 0
+      ? list[delta > 0 ? 0 : list.length - 1]
+      : list[Math.min(list.length - 1, Math.max(0, at + delta))]
+  if (next) goToPost(next.id)
+}
+function onKey(event) {
+  if (event.metaKey || event.ctrlKey || event.altKey) return
+  if (mode.value !== 'stories' || !mapPosts.value.length) return
+  const el = event.target
+  if (
+    el?.tagName === 'INPUT' ||
+    el?.tagName === 'TEXTAREA' ||
+    el?.isContentEditable
+  )
+    return
+  if (document.querySelector('.record-backdrop, .modal')) return
+  const delta = { j: 1, k: -1, ArrowDown: 1, ArrowUp: -1 }[event.key]
+  if (!delta) return
+  event.preventDefault()
+  step(delta)
+}
+function timeLabel(p) {
+  const t = new Date(p.created_at)
+  return Number.isNaN(t.getTime())
+    ? ''
+    : new Intl.DateTimeFormat('zh-CN', {
+        hour: '2-digit',
+        minute: '2-digit',
+      }).format(t)
+}
 let seq = 0,
   loadedRevision = -1,
   scroller,
@@ -457,6 +491,7 @@ function updateMonth() {
   cancelAnimationFrame(frame)
   frame = requestAnimationFrame(() => {
     if (!active || !root.value || !scroller) return
+    compactNav.value = scroller.scrollTop > 180
     const top = scroller.getBoundingClientRect().top + scrollInset() + 32
     const chapters = [...root.value.querySelectorAll('[data-month]')]
     const current =
@@ -477,9 +512,12 @@ function scrollInset() {
   const padding = scroller
     ? parseFloat(getComputedStyle(scroller).paddingTop)
     : 0
+  const headingEl = root.value?.querySelector('.chapter-heading')
+  // 章节头不吸顶时不占用偏移
   const heading =
-    root.value?.querySelector('.chapter-heading')?.getBoundingClientRect()
-      .height || 0
+    headingEl && getComputedStyle(headingEl).position === 'sticky'
+      ? headingEl.getBoundingClientRect().height || 0
+      : 0
   return Math.max(0, navigationHeight.value - padding) + heading + 12
 }
 function scrollToElement(target, inset) {
@@ -564,20 +602,9 @@ async function load() {
     return
   }
   try {
-    const [m, l, a] = await Promise.all([
-      api.get(`/api/circles/${circle}/timeline`),
-      api.get(`/api/circles/${circle}/lines`),
-      api.get(`/api/circles/${circle}/albums`),
-    ])
+    const { data } = await api.get(`/api/circles/${circle}/timeline`)
     if (request !== seq || circle !== auth.currentCircleId) return
-    months.value = m.data
-    lines.value = l.data
-    albums.value = a.data
-    if (
-      selectedLine.value &&
-      !lines.value.some((l) => l.id === selectedLine.value)
-    )
-      selectedLine.value = null
+    months.value = data
     loadedRevision = revision.value
   } catch (e) {
     if (request === seq) error.value = e.userMessage || '加载时间线失败'
@@ -590,112 +617,25 @@ onActivated(() => {
   active = true
   scroller = root.value.closest('.body-grid')
   scroller.addEventListener('scroll', updateMonth, { passive: true })
+  window.addEventListener('keydown', onKey)
   if (loadedRevision !== revision.value) load()
   else observe()
 })
 function cleanup() {
   active = false
-  lineModal.value = false
   scroller?.removeEventListener('scroll', updateMonth)
+  window.removeEventListener('keydown', onKey)
   observer?.disconnect()
   navigationObserver?.disconnect()
   cancelAnimationFrame(frame)
 }
 onDeactivated(cleanup)
 onBeforeUnmount(cleanup)
-watch([year, selectedLine, mode], async () => {
+watch([year, mode], async () => {
   await observe()
   scroller?.scrollTo({ top: 0, behavior: 'instant' })
 })
 watch(revision, () => {
   if (active) load()
 })
-function newLine() {
-  editingLine.value = null
-  Object.assign(lineForm, {
-    title: '',
-    kind: 'life',
-    parent_id: selectedLine.value,
-    albumIds: [],
-  })
-  lineError.value = ''
-  lineModal.value = true
-}
-function editLine() {
-  editingLine.value = currentLine.value.id
-  Object.assign(lineForm, {
-    title: currentLine.value.title,
-    kind: currentLine.value.kind,
-    parent_id: currentLine.value.parent_id,
-    albumIds: editableAlbums.value
-      .filter((a) => a.line_id === currentLine.value.id)
-      .map((a) => a.id),
-  })
-  lineError.value = ''
-  lineModal.value = true
-}
-async function saveLine() {
-  if (lineBusy.value) return
-  lineBusy.value = true
-  lineError.value = ''
-  try {
-    const payload = {
-      title: lineForm.title.trim(),
-      kind: lineForm.kind,
-      parent_id: lineForm.parent_id,
-    }
-    let id = editingLine.value
-    if (id)
-      await api.patch(
-        `/api/circles/${auth.currentCircleId}/lines/${id}`,
-        payload,
-      )
-    else {
-      const { data } = await api.post(
-        `/api/circles/${auth.currentCircleId}/lines`,
-        payload,
-      )
-      id = data.id
-      editingLine.value = id
-    }
-    for (const a of editableAlbums.value) {
-      const want = lineForm.albumIds.includes(a.id)
-      if ((want && a.line_id !== id) || (!want && a.line_id === id))
-        await api.patch(`/api/circles/${auth.currentCircleId}/albums/${a.id}`, {
-          line_id: want ? id : null,
-        })
-    }
-    selectedLine.value = id
-    lineModal.value = false
-    revision.value++
-  } catch (e) {
-    lineError.value = e.userMessage || '保存失败，可重试'
-  } finally {
-    lineBusy.value = false
-  }
-}
-async function removeLine() {
-  if (lineBusy.value) return
-  if (
-    !(await confirmDialog({
-      title: '删除时间线',
-      message: '分册与记录会保留，子分支将归入上级主线。',
-      confirmText: '删除时间线',
-      danger: true,
-    }))
-  )
-    return
-  lineBusy.value = true
-  try {
-    await api.delete(
-      `/api/circles/${auth.currentCircleId}/lines/${selectedLine.value}`,
-    )
-    selectedLine.value = null
-    revision.value++
-  } catch (e) {
-    error.value = e.userMessage || '删除失败'
-  } finally {
-    lineBusy.value = false
-  }
-}
 </script>
