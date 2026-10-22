@@ -200,52 +200,86 @@
               <X class="icon" />
             </button>
           </div>
+          <div class="guess-headline">
+            <span class="guess-score">我的积分 <strong>{{ myScore }}</strong></span>
+            <span v-if="!guessResult" class="guess-timer" :class="{ urgent: timerLeft <= 5 }">
+              倒计时 {{ timerLeft }}s
+            </span>
+            <span v-else class="guess-timer done">已作答</span>
+          </div>
           <img
             v-if="currentGuess"
             class="modal-photo"
             id="guess-photo"
-            :src="currentGuess?.preview_url"
+            :src="currentGuess.preview_url"
             alt="等待揭晓的回忆照片"
           />
-          <div class="modal-info">
+          <div class="modal-info guess-info">
             <div>
               <h2 id="guess-title">
-                {{ revealed ? '那天的答案' : '这张照片是哪一天？' }}
+                {{ guessResult ? '那天的答案' : '这张照片拍在哪个月？' }}
               </h2>
               <p id="guess-caption">
-                <template v-if="revealed && currentGuess">
-                  {{ currentGuess.author_nickname }} ·
-                  {{ formatDay(currentGuess.event_date) }} ·
-                  {{ currentGuess.content || '无文字' }}
+                <template v-if="guessResult">
+                  {{ guessResult.correct ? '猜对了！' : '差一点。' }}
+                  实际是 {{ guessResult.actual_label }}（{{ formatDay(guessResult.event_date) }}），
+                  由 {{ guessResult.author }} 拍下。
+                  <span class="guess-points">+{{ guessResult.points }} 分</span>
                 </template>
-                <template v-else>{{
-                  currentGuess
-                    ? '猜猜是谁拍的，再点揭晓答案。'
-                    : '分册还没有可用照片，加入接力留下第一张吧。'
-                }}</template>
+                <template v-else-if="currentGuess">
+                  {{ usedHint ? `提示：${hintText}` : '凭直觉选一个月份，快答有加分。' }}
+                </template>
+                <template v-else>分册还没有可用照片，加入接力留下第一张吧。</template>
               </p>
             </div>
-            <div class="modal-actions">
-              <button
-                class="outline"
-                type="button"
-                id="guess-reveal"
-                :disabled="!currentGuess || revealed"
-                @click="revealed = true"
-              >
-                揭晓答案
-              </button>
-              <button
-                class="secondary"
-                type="button"
-                id="guess-next"
-                :disabled="guessPool.length < 2"
-                @click="nextGuess"
-              >
-                下一张
-                <ArrowRight class="icon" />
-              </button>
-            </div>
+          </div>
+          <div class="guess-options">
+            <button
+              v-for="m in currentGuess?.options || []"
+              :key="m"
+              type="button"
+              class="guess-option"
+              :class="{
+                correct: guessResult && m === guessResult.actual_month,
+                wrong:
+                  guessResult && picked === m && m !== guessResult.actual_month,
+              }"
+              :disabled="!!guessResult || !currentGuess"
+              @click="answer(m)"
+            >
+              {{ monthLabel(m) }}
+            </button>
+          </div>
+          <div class="guess-foot">
+            <button
+              class="outline"
+              type="button"
+              id="guess-reveal"
+              :disabled="!currentGuess || !!guessResult || usedHint"
+              @click="useHint"
+            >
+              <Lightbulb :size="15" />
+              {{ usedHint ? '提示已用（-4 分）' : '用提示卡（-4 分）' }}
+            </button>
+            <button
+              class="secondary"
+              type="button"
+              id="guess-next"
+              :disabled="!guessResult"
+              @click="nextGuess"
+            >
+              下一张<ArrowRight class="icon" />
+            </button>
+          </div>
+          <div v-if="scoreboard.length" class="guess-board">
+            <h3>本册排行榜</h3>
+            <ol>
+              <li v-for="(row, i) in scoreboard" :key="row.user_id">
+                <span class="rank">{{ i + 1 }}</span>
+                <span class="name">{{ row.name }}</span>
+                <span class="pts">{{ row.points }} 分</span>
+              </li>
+            </ol>
           </div>
         </div>
       </div>
@@ -267,6 +301,7 @@ import MediaPreview from '../components/MediaPreview.vue'
 import {
   ArrowLeft,
   ArrowRight,
+  Lightbulb,
   Pencil,
   Plus,
   Sparkles,
@@ -287,9 +322,17 @@ const toast = inject('toast')
 const album = ref(null)
 const posts = ref([])
 const guessOpen = ref(false)
-const guessPool = ref([])
-const drawn = ref([])
-const revealed = ref(false)
+const guessRounds = ref([])
+const guessIndex = ref(0)
+const guessResult = ref(null)
+const picked = ref(null)
+const usedHint = ref(false)
+const hintText = ref('')
+const myScore = ref(0)
+const scoreboard = ref([])
+const timerLeft = ref(15)
+const roundStart = ref(0)
+let guessTimer = 0
 const lines = ref([]),
   manageOpen = ref(false),
   managing = ref(false),
@@ -317,10 +360,14 @@ const coverClass = computed(() => {
   return { empty: n === 0, single: n === 1 }
 })
 
-const currentGuess = computed(() => {
-  const left = guessPool.value.filter((g) => !drawn.value.includes(g.media_id))
-  return left[0] || guessPool.value[0] || null
-})
+const currentGuess = computed(
+  () => guessRounds.value[guessIndex.value] || null,
+)
+const monthNames = [
+  '一月', '二月', '三月', '四月', '五月', '六月',
+  '七月', '八月', '九月', '十月', '十一月', '十二月',
+]
+const monthLabel = (m) => monthNames[(Number(m) || 1) - 1]
 
 function avatarClass(id) {
   return ['av-coral', 'av-teal', 'av-gold', 'av-green'][Number(id || 0) % 4]
@@ -377,24 +424,98 @@ async function startGuess() {
   const circle = auth.currentCircleId,
     id = props.albumId
   try {
-    const { data } = await api.get(`/api/circles/${circle}/albums/${id}/guess`)
+    const [roundsRes, boardRes] = await Promise.all([
+      api.get(`/api/circles/${circle}/albums/${id}/guess/rounds`),
+      api.get(`/api/circles/${circle}/albums/${id}/guess/scoreboard`),
+    ])
     if (circle !== auth.currentCircleId || id !== props.albumId || !active)
       return
-    if (data.length < 2) toast('分册照片少于两张，请继续投稿')
-    guessPool.value = data
-    drawn.value = []
-    revealed.value = false
+    if (!roundsRes.data.length) {
+      toast('分册还没有照片，先加入接力留下第一张')
+      return
+    }
+    guessRounds.value = roundsRes.data
+    guessIndex.value = 0
+    applyBoard(boardRes.data)
+    resetRound()
     guessOpen.value = true
   } catch (e) {
     toast(e.userMessage || '加载猜照片失败')
   }
 }
 
+function applyBoard(data) {
+  scoreboard.value = data?.scoreboard || []
+  myScore.value = data?.my_score || 0
+}
+
+function stopTimer() {
+  clearInterval(guessTimer)
+  guessTimer = 0
+}
+
+function resetRound() {
+  guessResult.value = null
+  picked.value = null
+  usedHint.value = false
+  hintText.value = ''
+  timerLeft.value = 15
+  roundStart.value = Date.now()
+  stopTimer()
+  guessTimer = setInterval(() => {
+    timerLeft.value -= 1
+    if (timerLeft.value <= 0) stopTimer()
+  }, 1000)
+}
+
+async function answer(month) {
+  if (!currentGuess.value || guessResult.value) return
+  const circle = auth.currentCircleId,
+    id = props.albumId,
+    mediaId = currentGuess.value.media_id,
+    elapsed = Date.now() - roundStart.value
+  stopTimer()
+  picked.value = month
+  try {
+    const { data } = await api.post(
+      `/api/circles/${circle}/albums/${id}/guess/answer`,
+      {
+        media_id: mediaId,
+        guessed_month: month,
+        elapsed_ms: Math.min(elapsed, 120000),
+        used_hint: usedHint.value,
+      },
+    )
+    guessResult.value = data
+    myScore.value = data.my_score
+    scoreboard.value = data.scoreboard
+    if (data.correct) toast(`猜对了，+${data.points} 分`)
+  } catch (e) {
+    toast(e.userMessage || '提交答案失败')
+  }
+}
+
+async function useHint() {
+  if (!currentGuess.value || usedHint.value || guessResult.value) return
+  try {
+    const { data } = await api.get(
+      `/api/circles/${auth.currentCircleId}/albums/${props.albumId}/guess/hint`,
+      { params: { media_id: currentGuess.value.media_id } },
+    )
+    usedHint.value = true
+    hintText.value = [data.season, data.author ? `${data.author} 拍的` : '', data.place]
+      .filter(Boolean)
+      .join(' · ')
+  } catch (e) {
+    toast(e.userMessage || '提示卡暂时不可用')
+  }
+}
+
 function nextGuess() {
-  if (currentGuess.value) drawn.value.push(currentGuess.value.media_id)
-  revealed.value = false
-  const left = guessPool.value.filter((g) => !drawn.value.includes(g.media_id))
-  if (!left.length) drawn.value = []
+  stopTimer()
+  guessIndex.value =
+    guessIndex.value + 1 < guessRounds.value.length ? guessIndex.value + 1 : 0
+  resetRound()
 }
 
 onActivated(() => {
@@ -403,6 +524,7 @@ onActivated(() => {
 })
 onDeactivated(() => {
   active = false
+  stopTimer()
   guessOpen.value = false
   manageOpen.value = false
 })

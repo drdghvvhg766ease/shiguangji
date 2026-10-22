@@ -28,8 +28,21 @@ class Settings(BaseSettings):
     max_video_bytes: int = 100 * 1024 * 1024  # 100 MB
     max_video_seconds: int = 180  # 3 min
     max_photos_per_post: int = 9
+    max_audio_bytes: int = 20 * 1024 * 1024  # 20 MB
+    max_audio_seconds: int = 600  # 10 min
     photo_mime_types: tuple[str, ...] = ("image/jpeg", "image/png", "image/webp")
     video_mime_types: tuple[str, ...] = ("video/mp4", "video/quicktime")
+    audio_mime_types: tuple[str, ...] = (
+        "audio/mpeg",
+        "audio/mp3",
+        "audio/mp4",
+        "audio/x-m4a",
+        "audio/aac",
+        "audio/wav",
+        "audio/x-wav",
+        "audio/webm",
+        "audio/ogg",
+    )
 
     # Paths
     base_dir: Path = Path(__file__).resolve().parent.parent
@@ -37,7 +50,13 @@ class Settings(BaseSettings):
     tmp_dir: Path = upload_dir / "tmp"
     photo_dir: Path = upload_dir / "photos"
     video_dir: Path = upload_dir / "videos"
+    audio_dir: Path = upload_dir / "audios"
     preview_dir: Path = upload_dir / "previews"
+    export_dir: Path = base_dir / "exports"
+
+    # 导出
+    export_expire_hours: int = 72  # 过期自动清理
+    export_max_bytes: int = 3 * 1024 * 1024 * 1024  # 单个导出包上限 3 GB
 
     # CORS / CSRF
     frontend_origin: str = "http://localhost:5173"
@@ -64,4 +83,6 @@ settings.upload_dir.mkdir(parents=True, exist_ok=True)
 settings.tmp_dir.mkdir(parents=True, exist_ok=True)
 settings.photo_dir.mkdir(parents=True, exist_ok=True)
 settings.video_dir.mkdir(parents=True, exist_ok=True)
+settings.export_dir.mkdir(parents=True, exist_ok=True)
+settings.audio_dir.mkdir(parents=True, exist_ok=True)
 settings.preview_dir.mkdir(parents=True, exist_ok=True)

@@ -8,7 +8,7 @@ from fastapi.staticfiles import StaticFiles
 
 from .config import settings
 from .database import ensure_database, init_db
-from .routers import activity, admin, album, auth, circles, comments, lines, media, posts, social
+from .routers import activity, admin, album, auth, circles, comments, exports, lines, media, play, posts, search, social, tags
 from .security import verify_origin
 
 
@@ -52,12 +52,16 @@ def health():
 app.include_router(auth.router)
 app.include_router(circles.router)
 app.include_router(posts.router)
+app.include_router(tags.router)
 app.include_router(activity.router)
 app.include_router(social.router)
 app.include_router(lines.router)
 app.include_router(album.router)
 app.include_router(media.router)
 app.include_router(comments.router)
+app.include_router(play.router)
+app.include_router(search.router)
+app.include_router(exports.router)
 app.include_router(admin.router)
 
 

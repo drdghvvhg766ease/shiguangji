@@ -1,0 +1,175 @@
+/* ============ 主题引擎：预设主题 ============ */
+/* 通过 html[data-theme] 覆盖 :root 变量；本文件在 styles.css / gallery.css 之后加载。
+   自定义配色（data-theme="custom"）由 JS 直接写内联 CSS 变量，优先级最高。 */
+
+/* 暗夜 */
+html[data-theme='night'] {
+  --paper: #161a19;
+  --surface: #212726;
+  --ink: #e9e5dc;
+  --muted: #98a19b;
+  --line: #333b38;
+  --terracotta: #d9815f;
+  --terracotta-dark: #b86647;
+  --sage: #6f9c87;
+  --pine: #7fb3a0;
+  --gold: #cfa75e;
+  --seal: #c65a40;
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.32), 0 4px 14px rgba(0, 0, 0, 0.28);
+  --shadow-md: 0 2px 6px rgba(0, 0, 0, 0.34), 0 10px 28px rgba(0, 0, 0, 0.36);
+  --shadow-lg: 0 24px 70px rgba(0, 0, 0, 0.55);
+}
+html[data-theme='night'] body {
+  background: var(--paper);
+}
+html[data-theme='night'] .topbar {
+  background: rgba(33, 39, 38, 0.86);
+}
+html[data-theme='night'] .sidebar {
+  box-shadow: var(--shadow-xs);
+}
+html[data-theme='night'] .circle-select,
+html[data-theme='night'] .segmented,
+html[data-theme='night'] .album-grid button {
+  background: #242b29;
+}
+html[data-theme='night'] .nav-button {
+  color: #b7bdb8;
+}
+html[data-theme='night'] .nav-button:hover,
+html[data-theme='night'] .member-line:hover {
+  background: #272e2c;
+}
+html[data-theme='night'] .nav-button.active {
+  background: #26332e;
+}
+html[data-theme='night'] .side-label {
+  color: #6d7671;
+}
+html[data-theme='night'] .side-label::after {
+  background: linear-gradient(90deg, #3a4340, transparent);
+}
+html[data-theme='night'] .sidebar-members h3 {
+  color: #7d867f;
+}
+html[data-theme='night'] .form-group textarea,
+html[data-theme='night'] .form-group input,
+html[data-theme='night'] .form-group select {
+  background: #1a1f1e;
+  color: var(--ink);
+}
+html[data-theme='night'] .field-select {
+  color: var(--muted);
+}
+html[data-theme='night'] .upload-zone {
+  background: #1d2322;
+  border-color: #3a4441;
+}
+html[data-theme='night'] .upload-zone:hover {
+  background: #262421;
+}
+html[data-theme='night'] .skeleton {
+  background: linear-gradient(90deg, #242b29 25%, #2e3533 45%, #242b29 65%);
+  background-size: 200% 100%;
+}
+html[data-theme='night'] .invite-box {
+  background: #21302a;
+  border-color: #31473e;
+}
+html[data-theme='night'] .tag {
+  background: rgba(217, 129, 95, 0.14);
+  border-color: rgba(217, 129, 95, 0.32);
+  color: #e0997c;
+}
+html[data-theme='night'] .tag:hover {
+  background: rgba(217, 129, 95, 0.22);
+}
+html[data-theme='night'] .outline {
+  border-color: #3d4643;
+}
+html[data-theme='night'] .outline:hover {
+  background: #24302b;
+}
+html[data-theme='night'] .empty-state {
+  border-color: #3a4340;
+}
+html[data-theme='night'] .more:hover {
+  background: #272e2c;
+}
+html[data-theme='night'] .rail-quote {
+  color: #8b958f;
+}
+html[data-theme='night'] .photo-detail {
+  background: #101312;
+}
+html[data-theme='night'] * {
+  scrollbar-color: #3a4340 transparent;
+}
+html[data-theme='night'] *::-webkit-scrollbar-thumb {
+  background: #3a4340;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+/* 樱花 */
+html[data-theme='sakura'] {
+  --paper: #fbf3f4;
+  --surface: #fffafa;
+  --ink: #4a3438;
+  --muted: #9a7c82;
+  --line: #efdbdf;
+  --terracotta: #e0809a;
+  --terracotta-dark: #c96684;
+  --sage: #93b8a2;
+  --pine: #a5516c;
+  --gold: #d9ab59;
+  --seal: #c2526f;
+}
+
+/* 海盐 */
+html[data-theme='ocean'] {
+  --paper: #edf4f5;
+  --surface: #fcfeff;
+  --ink: #23424e;
+  --muted: #6f8890;
+  --line: #d8e5e8;
+  --terracotta: #e07a54;
+  --terracotta-dark: #c16440;
+  --sage: #7fb0a4;
+  --pine: #2f6b7a;
+  --gold: #d0a95c;
+  --seal: #b05a3c;
+}
+
+/* 松烟 */
+html[data-theme='pine'] {
+  --paper: #eef2ec;
+  --surface: #fafcf8;
+  --ink: #253329;
+  --muted: #71806f;
+  --line: #dde5da;
+  --terracotta: #c96b4a;
+  --terracotta-dark: #a85638;
+  --sage: #7ba58c;
+  --pine: #2e5346;
+  --gold: #c9a356;
+  --seal: #a8542f;
+}
+
+/* 金穗 */
+html[data-theme='wheat'] {
+  --paper: #faf3e2;
+  --surface: #fffdf4;
+  --ink: #4d4028;
+  --muted: #8f8064;
+  --line: #eadfc0;
+  --terracotta: #d9903f;
+  --terracotta-dark: #b9772c;
+  --sage: #9aa86a;
+  --pine: #8a6d2f;
+  --gold: #d9ab59;
+  --seal: #b5642c;
+}
+
+/* 自定义：辅助变量由 JS 以 color-mix 推导，无需在此定义 */

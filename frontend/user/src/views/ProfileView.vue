@@ -53,13 +53,14 @@
 
 <script setup>
 import { computed, ref, watch } from 'vue'
-import { Bell, Bookmark, Clock3, LogOut, Settings2 } from 'lucide-vue-next'
+import { Bell, Bookmark, Clock3, LogOut, Palette, Settings2 } from 'lucide-vue-next'
 import { useAuthStore } from '../stores/auth'
 import ActivityTimeline from '../components/ActivityTimeline.vue'
 import UserAvatar from '../components/UserAvatar.vue'
 import ProfileSettings from '../components/ProfileSettings.vue'
 import MessageCenter from '../components/MessageCenter.vue'
 import FavoritesCollection from '../components/FavoritesCollection.vue'
+import ThemeStudio from '../components/ThemeStudio.vue'
 
 const props = defineProps({ profileTab: { type: String, default: 'activity' } })
 const emit = defineEmits([
@@ -77,11 +78,13 @@ const components = {
   activity: ActivityTimeline,
   messages: MessageCenter,
   favorites: FavoritesCollection,
+  theme: ThemeStudio,
 }
 const tabs = [
   { key: 'activity', label: '痕迹线', icon: Clock3 },
   { key: 'messages', label: '消息', icon: Bell },
   { key: 'favorites', label: '收藏', icon: Bookmark },
+  { key: 'theme', label: '装扮', icon: Palette },
 ]
 function selectTab(key) {
   tab.value = key

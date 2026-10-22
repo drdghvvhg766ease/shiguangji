@@ -92,6 +92,14 @@
         <div class="top-actions">
           <span class="today">{{ todayLabel }}</span>
           <button
+            class="icon-button search-entry"
+            title="搜索回忆（Ctrl K）"
+            aria-label="搜索回忆"
+            @click="searchOpen = true"
+          >
+            <SearchIcon :size="19" />
+          </button>
+          <button
             class="icon-button notification-entry"
             title="消息中心"
             :aria-label="`消息中心${unreadCount ? `，${unreadCount}条未读` : ''}`"
@@ -120,6 +128,13 @@
           >
             {{ auth.currentCircle?.name || '圈子' }}
             <ChevronDown class="icon" /></button
+          ><button
+            class="icon-button mobile-search"
+            aria-label="搜索回忆"
+            title="搜索回忆"
+            @click="searchOpen = true"
+          >
+            <SearchIcon :size="19" /></button
           ><button
             class="icon-button notification-entry"
             title="消息中心"
@@ -285,9 +300,18 @@
     </button>
   </nav>
 
+  <PwaInstall v-if="!showLogin" />
   <div class="toast" :class="{ show: toastMsg }" role="status">
     {{ toastMsg }}
   </div>
+  <GlobalSearch
+    v-if="searchOpen && auth.user"
+    :circles="auth.circles"
+    :circle-id="auth.currentCircleId"
+    @close="searchOpen = false"
+    @open-post="openFromSearch"
+    @open-album="openAlbumFromSearch"
+  />
   <RecordDetail
     v-if="detailRequest"
     :request="detailRequest"
@@ -299,6 +323,7 @@
 <script setup>
 import {
   computed,
+  defineAsyncComponent,
   nextTick,
   onBeforeUnmount,
   onMounted,
@@ -316,10 +341,13 @@ import {
   Images,
   LayoutGrid,
   Plus,
+  Search as SearchIcon,
+  Sparkles,
   UsersRound,
   UserRound,
 } from 'lucide-vue-next'
 import { useAuthStore } from './stores/auth'
+import { useThemeStore } from './stores/theme'
 import api from './api'
 import LoginView from './views/LoginView.vue'
 import FeedView from './views/FeedView.vue'
@@ -328,11 +356,16 @@ import AlbumView from './views/AlbumView.vue'
 import AlbumDetailView from './views/AlbumDetailView.vue'
 import ComposeView from './views/ComposeView.vue'
 import CircleView from './views/CircleView.vue'
+import PlayView from './views/PlayView.vue'
 import ProfileView from './views/ProfileView.vue'
 import RecordDetail from './components/RecordDetail.vue'
 import UserAvatar from './components/UserAvatar.vue'
+import PwaInstall from './components/PwaInstall.vue'
+
+const GlobalSearch = defineAsyncComponent(() => import('./components/GlobalSearch.vue'))
 
 const auth = useAuthStore()
+const theme = useThemeStore()
 const activeView = ref('feed')
 const profileTab = ref('activity'),
   unreadCount = ref(0)
@@ -343,6 +376,7 @@ const albums = ref([])
 const toastMsg = ref('')
 const scrollContainer = ref(null)
 const detailRequest = ref(null)
+const searchOpen = ref(false)
 const revision = ref(0)
 const draftGuard = ref(null)
 const scrollPositions = new Map()
@@ -355,6 +389,7 @@ const viewComponent = computed(
       'album-detail': AlbumDetailView,
       compose: ComposeView,
       circle: CircleView,
+      play: PlayView,
       profile: ProfileView,
     })[activeView.value],
 )
@@ -372,6 +407,7 @@ const navItems = [
   { view: 'feed', label: '照片墙', icon: LayoutGrid },
   { view: 'timeline', label: '生活痕迹线', icon: Clock3 },
   { view: 'album', label: '共同相册', icon: Images },
+  { view: 'play', label: '一起玩', icon: Sparkles },
   { view: 'circle', label: '圈子', icon: UsersRound },
 ]
 const mobileNav = [
@@ -379,7 +415,7 @@ const mobileNav = [
   { view: 'timeline', label: '时间轴', icon: Clock3 },
   { view: 'compose', label: '发布', icon: Plus },
   { view: 'album', label: '相册', icon: Images },
-  { view: 'circle', label: '圈子', icon: UsersRound },
+  { view: 'play', label: '一起玩', icon: Sparkles },
 ]
 
 const titleMap = {
@@ -389,6 +425,7 @@ const titleMap = {
   'album-detail': '主题分册',
   compose: '记录这一刻',
   circle: '圈子',
+  play: '一起玩',
   profile: '个人主页',
 }
 
@@ -487,6 +524,27 @@ async function loadNotifications() {
   }
 }
 
+function openFromSearch(payload) {
+  searchOpen.value = false
+  detailRequest.value = payload
+}
+
+async function openAlbumFromSearch(album) {
+  searchOpen.value = false
+  if (album.circle_id && album.circle_id !== auth.currentCircleId) {
+    auth.setCurrentCircle(album.circle_id)
+  }
+  await openAlbum(album.id)
+}
+
+function onGlobalKey(event) {
+  const key = event.key?.toLowerCase()
+  if (key !== 'k' || !(event.metaKey || event.ctrlKey)) return
+  if (showLogin.value) return
+  event.preventDefault()
+  searchOpen.value = !searchOpen.value
+}
+
 async function openAlbum(id) {
   if (!(await canLeave())) return
   saveScroll()
@@ -566,10 +624,20 @@ watch(
     loadNotifications()
   },
 )
+watch(
+  () => auth.user,
+  (user) => {
+    /* 登录后按账号同步主题；退出登录回到本地缓存主题 */
+    if (user) theme.syncFromUser(user)
+    else theme.boot()
+  },
+)
 
 onMounted(async () => {
+  theme.boot()
   await auth.fetchMe()
   if (auth.user) {
+    theme.syncFromUser(auth.user)
     auth.restoreCircle()
     await auth.fetchCircles()
     await loadRail()
@@ -578,8 +646,10 @@ onMounted(async () => {
   notificationTimer = setInterval(() => {
     if (!document.hidden) loadNotifications()
   }, 30000)
+  window.addEventListener('keydown', onGlobalKey)
 })
 onBeforeUnmount(() => {
+  window.removeEventListener('keydown', onGlobalKey)
   clearInterval(notificationTimer)
   notificationSequence++
   clearTimeout(toastTimer)

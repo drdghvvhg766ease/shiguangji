@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_serializer
+from pydantic import BaseModel, ConfigDict, Field, field_serializer, field_validator
 
 
 class ORMModel(BaseModel):
@@ -31,6 +31,41 @@ class PasswordUpdate(BaseModel):
     new_password: str = Field(min_length=6, max_length=64)
 
 
+# ---------- Theme ----------
+THEME_PRESETS = {"default", "night", "sakura", "ocean", "pine", "wheat", "custom"}
+THEME_CUSTOM_KEYS = {"--paper", "--surface", "--ink", "--terracotta", "--pine"}
+
+
+class ThemeUpdate(BaseModel):
+    preset: str = Field(default="default", max_length=16)
+    custom: dict[str, str] | None = None
+
+    @field_validator("preset")
+    @classmethod
+    def check_preset(cls, value):
+        if value not in THEME_PRESETS:
+            raise ValueError("未知的主题预设")
+        return value
+
+    @field_validator("custom")
+    @classmethod
+    def check_custom(cls, value):
+        if value is None:
+            return value
+        import re
+
+        cleaned = {}
+        for key, color in value.items():
+            if key not in THEME_CUSTOM_KEYS:
+                raise ValueError(f"不支持自定义变量 {key}")
+            if not re.fullmatch(r"#[0-9a-fA-F]{6}", color or ""):
+                raise ValueError("颜色需为 #RRGGBB 格式")
+            cleaned[key] = color.lower()
+        if not cleaned:
+            raise ValueError("自定义配色不能为空")
+        return cleaned
+
+
 class UserOut(ORMModel):
     id: int
     username: str
@@ -38,6 +73,7 @@ class UserOut(ORMModel):
     avatar: str | None = None
     is_admin: bool = False
     status: str = "active"
+    theme_preference: str | None = None
     created_at: datetime
 
     @field_serializer("avatar")
@@ -312,3 +348,14 @@ class LineInput(BaseModel):
     title: str = Field(min_length=1, max_length=64)
     parent_id: int | None = None
     kind: Literal["life", "travel", "graduation", "other"] = "life"
+
+
+# ---------- 圈子活动标签 ----------
+class TagInput(BaseModel):
+    name: str = Field(min_length=1, max_length=20)
+
+
+class TagOut(BaseModel):
+    id: int
+    name: str
+    post_count: int = 0

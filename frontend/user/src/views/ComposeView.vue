@@ -74,6 +74,11 @@
         </div>
 
         <div class="form-group">
+          <label for="voice-recorder">语音 / 心情电台</label>
+          <VoiceRecorder id="voice-recorder" v-model="voiceFile" />
+        </div>
+
+        <div class="form-group">
           <label for="memory-text">这一天想说什么</label>
           <textarea
             id="memory-text"
@@ -90,14 +95,30 @@
           <div class="form-group">
             <label for="memory-tag">活动标签</label>
             <select id="memory-tag" v-model="activityTag">
-              <option value="毕业">毕业</option>
-              <option value="旅行">旅行</option>
-              <option value="聚餐">聚餐</option>
-              <option value="日常">日常</option>
-              <option value="节日">节日</option>
-              <option value="运动">运动</option>
-              <option value="学习">学习</option>
+              <option v-for="name in tagOptions" :key="name" :value="name">
+                {{ name }}
+              </option>
+              <option
+                v-if="
+                  activityTag !== '__custom' &&
+                  !tagOptions.includes(activityTag)
+                "
+                :value="activityTag"
+              >
+                {{ activityTag }}
+              </option>
+              <option value="__custom">自定义标签…</option>
             </select>
+            <input
+              v-if="activityTag === '__custom'"
+              v-model="customTag"
+              class="tag-custom"
+              style="margin-top: 8px"
+              type="text"
+              maxlength="20"
+              placeholder="输入新标签，如：露营"
+              aria-label="自定义活动标签"
+            />
           </div>
         </div>
 
@@ -168,6 +189,7 @@ import {
 } from 'lucide-vue-next'
 import { confirmDialog } from '../utils/confirm'
 import FootprintMap from '../components/FootprintMap.vue'
+import VoiceRecorder from '../components/VoiceRecorder.vue'
 import api from '../api'
 import { useAuthStore } from '../stores/auth'
 
@@ -183,9 +205,12 @@ const photoFiles = ref([])
 const previews = ref([])
 const videoFile = ref(null)
 const videoName = ref('')
+const voiceFile = ref(null)
 const content = ref('')
 const eventDate = ref(new Date().toISOString().slice(0, 10))
 const activityTag = ref('日常')
+const tagOptions = ref(['日常', '毕业', '聚餐', '旅行', '节日', '运动', '学习'])
+const customTag = ref('')
 const albumId = ref(props.presetAlbumId)
 const albums = ref([])
 const lines = ref([]),
@@ -212,6 +237,7 @@ const dirty = computed(
     content.value.trim() ||
     photoFiles.value.length ||
     videoFile.value ||
+    voiceFile.value ||
     location.value ||
     lineId.value !== initialLine.value ||
     albumId.value !== props.presetAlbumId ||
@@ -239,9 +265,11 @@ function reset() {
   photoFiles.value = []
   videoFile.value = null
   videoName.value = ''
+  voiceFile.value = null
   content.value = ''
   eventDate.value = initialDate
   activityTag.value = '日常'
+  customTag.value = ''
   albumId.value = props.presetAlbumId
   lineId.value = initialLine.value
   location.value = null
@@ -358,12 +386,16 @@ function onDrop(e) {
 async function submit() {
   if (submitting.value) return
   error.value = ''
-  if (kind.value === 'photo' && !photoFiles.value.length) {
-    error.value = '请选择至少一张照片'
+  if (kind.value === 'photo' && !photoFiles.value.length && !voiceFile.value) {
+    error.value = '请选择至少一张照片，或录一段语音'
     return
   }
   if (kind.value === 'video' && !videoFile.value) {
     error.value = '请选择一段视频'
+    return
+  }
+  if (voiceFile.value && kind.value === 'video') {
+    error.value = '视频需要单独一条记录，请先移除语音'
     return
   }
   submitting.value = true
@@ -372,7 +404,11 @@ async function submit() {
     const fd = new FormData()
     fd.append('content', content.value)
     fd.append('event_date', eventDate.value)
-    if (activityTag.value) fd.append('activity_tag', activityTag.value)
+    const tag =
+      activityTag.value === '__custom'
+        ? customTag.value.trim()
+        : activityTag.value
+    if (tag) fd.append('activity_tag', tag)
     if (albumId.value != null) fd.append('album_id', String(albumId.value))
     if (lineId.value != null) fd.append('line_id', String(lineId.value))
     if (location.value) {
@@ -385,6 +421,8 @@ async function submit() {
     } else {
       fd.append('files', videoFile.value)
     }
+    if (voiceFile.value && kind.value === 'photo')
+      fd.append('files', voiceFile.value)
     await api.post(`/api/circles/${auth.currentCircleId}/posts`, fd, {
       headers: { 'Content-Type': 'multipart/form-data' },
       onUploadProgress: (e) => {
@@ -426,7 +464,23 @@ async function loadOptions() {
     /* optional */
   }
 }
-onActivated(loadOptions)
+async function loadTags() {
+  const circle = auth.currentCircleId
+  if (!circle) return
+  try {
+    const { data } = await api.get(`/api/circles/${circle}/tags`)
+    if (circle !== auth.currentCircleId) return
+    const names = data.map((tag) => tag.name)
+    if (!names.length) return
+    tagOptions.value = ['日常', ...names.filter((name) => name !== '日常')]
+  } catch {
+    /* 标签接口不可用时保留默认选项 */
+  }
+}
+onActivated(() => {
+  loadOptions()
+  loadTags()
+})
 watch(
   () => auth.currentCircleId,
   async () => {
@@ -434,6 +488,7 @@ watch(
       circle = auth.currentCircleId
     albums.value = []
     if (!auth.currentCircleId) return
+    loadTags()
     try {
       const [a, l] = await Promise.all([
         api.get(`/api/circles/${circle}/albums`),

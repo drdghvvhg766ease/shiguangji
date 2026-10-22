@@ -83,6 +83,8 @@
           </div>
         </div>
       </div>
+
+      <CircleExport :circle-id="current.id" />
     </template>
 
     <!-- 建圈 / 加入 -->
@@ -286,6 +288,7 @@ import api from '../api'
 import { useAuthStore } from '../stores/auth'
 import { confirmDialog } from '../utils/confirm'
 import CircleManagement from '../components/CircleManagement.vue'
+import CircleExport from '../components/CircleExport.vue'
 
 const auth = useAuthStore()
 defineEmits(['logout'])

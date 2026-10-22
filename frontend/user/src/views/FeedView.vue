@@ -17,14 +17,25 @@
       <p>{{ auth.user?.nickname || auth.user?.username }}，今天也值得记住。</p>
     </div>
     <div class="filter-row">
-      <div class="segmented">
+      <div class="tag-row">
+        <div class="segmented">
+          <button
+            v-for="chip in tagChips"
+            :key="chip.name"
+            :class="{ active: tagFilter === chip.name, empty: !chip.count }"
+            @click="tagFilter = chip.name"
+          >
+            {{ chip.label
+            }}<span v-if="chip.count" class="tag-count">{{ chip.count }}</span>
+          </button>
+        </div>
         <button
-          v-for="tag in tags"
-          :key="tag"
-          :class="{ active: tagFilter === tag }"
-          @click="tagFilter = tag"
+          class="tag-manage"
+          type="button"
+          title="新增 / 改名 / 删除活动标签"
+          @click="showTagManager = true"
         >
-          {{ tag === 'all' ? '全部' : tag }}
+          <Pencil :size="13" />管理标签
         </button>
       </div>
       <div class="filters-right">
@@ -95,6 +106,13 @@
         <span></span>把日子，留在这里。<span></span>
       </div>
     </template>
+    <TagManager
+      v-if="showTagManager && auth.currentCircleId"
+      :circle-id="auth.currentCircleId"
+      :tags="tagList"
+      @close="showTagManager = false"
+      @saved="onTagsSaved"
+    />
     <div v-else class="empty-state">
       {{
         !auth.currentCircleId
@@ -108,28 +126,44 @@
 </template>
 <script setup>
 import { computed, inject, onActivated, onDeactivated, ref, watch } from 'vue'
-import { Images, Plus } from 'lucide-vue-next'
+import { Images, Pencil, Plus } from 'lucide-vue-next'
 import api from '../api'
 import { useAuthStore } from '../stores/auth'
 import MediaPreview from '../components/MediaPreview.vue'
 import StoryCaption from '../components/StoryCaption.vue'
+import TagManager from '../components/TagManager.vue'
 const emit = defineEmits(['nav', 'open-post'])
 const auth = useAuthStore(),
   revision = inject('revision')
 const posts = ref([]),
   members = ref([]),
+  tagList = ref([]),
   tagFilter = ref('all'),
   memberFilter = ref(null),
   sortBy = ref('created'),
+  showTagManager = ref(false),
   loading = ref(true),
   error = ref('')
 let request = 0,
   loadedRevision = -1,
   active = false
-const tags = computed(() => [
-  'all',
-  ...new Set(posts.value.map((p) => p.activity_tag).filter(Boolean)),
-])
+const tagChips = computed(() => {
+  const counts = new Map()
+  for (const post of posts.value) {
+    if (!post.activity_tag) continue
+    counts.set(post.activity_tag, (counts.get(post.activity_tag) || 0) + 1)
+  }
+  const chips = tagList.value.map((tag) => ({
+    name: tag.name,
+    label: tag.name,
+    count: counts.get(tag.name) ?? tag.post_count ?? 0,
+  }))
+  const known = new Set(chips.map((chip) => chip.name))
+  for (const [name, count] of counts) {
+    if (!known.has(name)) chips.push({ name, label: name, count })
+  }
+  return [{ name: 'all', label: '全部', count: posts.value.length }, ...chips]
+})
 const mediaCount = computed(() =>
   posts.value.reduce((n, p) => n + p.media.length, 0),
 )
@@ -171,22 +205,32 @@ async function load() {
   if (!circle) {
     posts.value = []
     members.value = []
+    tagList.value = []
     return
   }
   try {
-    const [p, m] = await Promise.all([
+    const [p, m, t] = await Promise.all([
       api.get(`/api/circles/${circle}/posts`),
       api.get(`/api/circles/${circle}/members`),
+      api
+        .get(`/api/circles/${circle}/tags`)
+        .catch(() => ({ data: [] })),
     ])
     if (seq !== request || circle !== auth.currentCircleId) return
     posts.value = p.data
     members.value = m.data
+    tagList.value = t.data
     loadedRevision = revision.value
   } catch (e) {
     if (seq === request) error.value = e.userMessage || '加载失败，请重试'
   } finally {
     if (seq === request) loading.value = false
   }
+}
+async function onTagsSaved() {
+  await load()
+  if (!tagChips.value.some((chip) => chip.name === tagFilter.value))
+    tagFilter.value = 'all'
 }
 onActivated(() => {
   active = true
@@ -197,5 +241,9 @@ onDeactivated(() => {
 })
 watch(revision, () => {
   if (active) load()
+})
+watch(tagChips, (list) => {
+  if (!list.some((chip) => chip.name === tagFilter.value))
+    tagFilter.value = 'all'
 })
 </script>

@@ -149,6 +149,13 @@ a:focus-visible {
   gap: 12px;
   margin: 24px 0;
 }
+.tag-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+}
 .segmented {
   flex-wrap: wrap;
   border: 0;
@@ -206,9 +213,53 @@ a:focus-visible {
   box-shadow: none;
   transform: none;
 }
+.segmented button .tag-count {
+  font-size: 11px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.5;
+  margin-left: -1px;
+}
+.segmented button.empty {
+  color: color-mix(in srgb, var(--muted) 80%, transparent);
+}
+.segmented button.empty .tag-count {
+  opacity: 0.32;
+}
+.segmented button.active .tag-count {
+  opacity: 0.7;
+}
 .filters-right {
   flex-wrap: wrap;
   gap: 8px;
+}
+.tag-manage {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 32px;
+  margin-left: 2px;
+  padding: 0 12px;
+  border: 1px dashed color-mix(in srgb, var(--terracotta) 46%, transparent);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--terracotta);
+  font-size: 12px;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background-color 0.2s var(--ease-out),
+    border-color 0.2s var(--ease-out),
+    color 0.2s var(--ease-out);
+}
+.tag-manage:hover {
+  background: color-mix(in srgb, var(--terracotta) 10%, transparent);
+  border-color: var(--terracotta);
+  border-style: solid;
+}
+.tag-manage:focus-visible {
+  outline: 2px solid var(--terracotta);
+  outline-offset: 2px;
 }
 .field-select {
   border-radius: 4px;
@@ -233,9 +284,22 @@ a:focus-visible {
   color: var(--muted);
   margin: 0;
 }
+/* 记录卡：照片与文字同在一张圆角卡里，别再让文字裸挂在图片下面 */
 .photo-story {
-  margin: 0 0 32px;
+  margin: 0 0 26px;
   break-inside: avoid;
+  padding: 9px 9px 6px;
+  border-radius: 20px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-sm);
+  transition:
+    transform 0.42s var(--ease-out),
+    box-shadow 0.42s var(--ease-out);
+}
+.featured-story {
+  padding: 11px 11px 4px;
+  border-radius: 24px;
 }
 .story-image {
   display: block;
@@ -245,7 +309,11 @@ a:focus-visible {
   padding: 0;
   background: #e7ebe7;
   overflow: hidden;
-  border-radius: 3px;
+  border-radius: 13px;
+}
+.story-image:focus-visible {
+  outline: 2px solid var(--terracotta);
+  outline-offset: 3px;
 }
 .media-preview {
   position: relative;
@@ -260,6 +328,12 @@ a:focus-visible {
 .story-image:hover .media-preview img,
 .chronicle-images button:hover img {
   transform: scale(1.025);
+}
+@media (hover: hover) {
+  .photo-story:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-md);
+  }
 }
 .media-placeholder {
   min-height: 180px;
@@ -285,11 +359,13 @@ a:focus-visible {
   color: white;
   border-radius: 50%;
 }
+/* 头条大图保持原比例，只有过高时才收一收，避免画面被裁掉 */
 .featured-story > .story-image .media-preview {
-  aspect-ratio: 1.9;
+  background: #e7ebe7;
 }
 .featured-story > .story-image img {
-  height: 100%;
+  height: auto;
+  max-height: min(520px, 62vh);
   object-fit: cover;
 }
 .story-count {
@@ -299,18 +375,21 @@ a:focus-visible {
   display: flex;
   gap: 6px;
   align-items: center;
-  background: #fffef5ed;
+  background: #fffef5e0;
   color: #333;
-  padding: 6px 10px;
+  padding: 6px 12px;
   font-size: 12px;
-  border-radius: 3px;
+  border-radius: 999px;
+  border: 1px solid #ffffff80;
+  box-shadow: 0 4px 12px -6px #1d262366;
+  backdrop-filter: blur(6px);
 }
 .photo-columns {
   columns: 2;
   column-gap: 24px;
 }
 .story-caption {
-  padding: 14px 0 0;
+  padding: 13px 9px 9px;
   position: relative;
 }
 .activity-filters {
@@ -943,11 +1022,13 @@ a:focus-visible {
   color: var(--muted);
 }
 .text-story {
+  width: 100%;
   padding: 36px;
   text-align: left;
   line-height: 2;
   font-family: var(--serif);
   background: #eef2ed;
+  border-radius: 13px;
 }
 .collection-end {
   display: flex;
@@ -970,7 +1051,7 @@ a:focus-visible {
 }
 .feed-skeleton > div {
   height: 260px;
-  border-radius: 3px;
+  border-radius: 16px;
 }
 .feed-skeleton > div:first-child {
   grid-column: 1/-1;
@@ -2842,6 +2923,30 @@ a:focus-visible {
   .filters-right {
     width: 100%;
   }
+  .tag-row {
+    gap: 8px;
+    flex-wrap: nowrap;
+    width: 100%;
+  }
+  .tag-row .segmented {
+    flex: 1 1 auto;
+    min-width: 0;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    padding: 2px 0;
+  }
+  .tag-row .segmented button {
+    flex: none;
+    white-space: nowrap;
+  }
+  .tag-row .segmented::-webkit-scrollbar {
+    display: none;
+  }
+  .tag-row .tag-manage {
+    flex: none;
+  }
   .photo-columns {
     column-gap: 14px;
   }
@@ -2855,11 +2960,23 @@ a:focus-visible {
   .story-comment {
     position: static;
   }
-  .featured-story > .story-image .media-preview {
-    aspect-ratio: 1.45;
+  .story-image {
+    border-radius: 11px;
+  }
+  .featured-story > .story-image img {
+    max-height: min(460px, 58vh);
   }
   .photo-story {
-    margin-bottom: 22px;
+    padding: 7px 7px 2px;
+    border-radius: 16px;
+    margin-bottom: 18px;
+  }
+  .featured-story {
+    padding: 8px 8px 2px;
+    border-radius: 20px;
+  }
+  .story-caption {
+    padding: 11px 6px 6px;
   }
   .month-nav {
     top: -24px;

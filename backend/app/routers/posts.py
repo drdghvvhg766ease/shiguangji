@@ -22,6 +22,7 @@ from ..media_utils import (
     save_upload_stream,
     sha256_file,
     unique_path,
+    validate_audio_file,
     validate_photo_bytes,
     validate_video_file,
 )
@@ -37,6 +38,7 @@ from ..schemas import (
     TimelineMonth,
 )
 from ..security import get_current_user, is_circle_manager, require_circle_member
+from ..tag_utils import ensure_tag
 from ..profiles import avatar_url
 from ..notifications import notify
 from .lines import ensure_line, descendants
@@ -154,22 +156,29 @@ async def create_post(
         raise HTTPException(status_code=400, detail="生活日期格式错误，应为 YYYY-MM-DD")
 
     if not files:
-        raise HTTPException(status_code=400, detail="请至少上传一张照片或一段视频")
+        raise HTTPException(status_code=400, detail="请至少上传一张照片、一段视频或一段语音")
 
-    kinds: set[str] = set()
+    kinds: list[str] = []
+    photo_count = 0
     for f in files:
         mime = (f.content_type or "").lower()
         if mime in settings.photo_mime_types:
-            kinds.add("photo")
+            photo_count += 1
+            kinds.append("photo")
         elif mime in settings.video_mime_types:
-            kinds.add("video")
+            kinds.append("video")
+        elif mime in settings.audio_mime_types:
+            kinds.append("audio")
         else:
             raise HTTPException(status_code=400, detail=f"不支持的文件类型: {mime or f.filename}")
-    if kinds == {"photo", "video"}:
-        raise HTTPException(status_code=400, detail="照片与视频暂不能混在同一条记录中")
-    if "video" in kinds and len(files) > 1:
+    distinct = set(kinds)
+    if "video" in distinct and len(distinct) > 1:
+        raise HTTPException(status_code=400, detail="视频需要单独一条记录，不能与照片或语音混传")
+    if kinds.count("video") > 1:
         raise HTTPException(status_code=400, detail="每条记录只能上传一段视频")
-    if "photo" in kinds and len(files) > settings.max_photos_per_post:
+    if kinds.count("audio") > 1:
+        raise HTTPException(status_code=400, detail="每条记录只能上传一段语音")
+    if photo_count > settings.max_photos_per_post:
         raise HTTPException(status_code=400, detail=f"每条最多 {settings.max_photos_per_post} 张照片")
 
     if album_id is not None:
@@ -189,6 +198,7 @@ async def create_post(
     )
     db.add(post)
     db.flush()
+    ensure_tag(db, circle_id, post.activity_tag)
 
     tmp_paths = []
     saved_paths = []
@@ -196,10 +206,11 @@ async def create_post(
         for idx, upload in enumerate(files):
             mime = (upload.content_type or "").lower()
             is_photo = mime in settings.photo_mime_types
+            is_audio = mime in settings.audio_mime_types
             tmp_path = unique_path(
                 settings.tmp_dir,
                 upload.filename or "upload.bin",
-                ".jpg" if is_photo else ".mp4",
+                ".jpg" if is_photo else (".m4a" if is_audio else ".mp4"),
             )
             tmp_paths.append(tmp_path)
             size = await save_upload_stream(upload, tmp_path)
@@ -232,7 +243,7 @@ async def create_post(
                         sort_order=idx,
                     )
                 )
-            else:
+            elif not is_audio:
                 if size > settings.max_video_bytes:
                     raise MediaError("视频不能超过 100 MB")
                 duration = validate_video_file(tmp_path, mime)
@@ -258,6 +269,29 @@ async def create_post(
                         sha256=digest,
                         duration_seconds=duration if duration is not None else probe_video_duration(final),
                         sort_order=0,
+                    )
+                )
+            else:
+                if size > settings.max_audio_bytes:
+                    raise MediaError("语音不能超过 20 MB")
+                duration = validate_audio_file(tmp_path, mime)
+                final = unique_path(settings.audio_dir, upload.filename or "voice.m4a", ".m4a")
+                atomic_move(tmp_path, final)
+                saved_paths.append(final)
+                tmp_paths.remove(tmp_path)
+                digest = sha256_file(final)
+                db.add(
+                    Media(
+                        post_id=post.id,
+                        kind="audio",
+                        original_filename=upload.filename or final.name,
+                        mime_type=mime,
+                        original_path=relative_to_upload(final),
+                        preview_path=None,
+                        size_bytes=size,
+                        sha256=digest,
+                        duration_seconds=duration if duration is not None else probe_video_duration(final),
+                        sort_order=idx,
                     )
                 )
         db.flush()
@@ -361,6 +395,7 @@ def update_post(
         post.event_date = data.event_date
     if data.activity_tag is not None:
         post.activity_tag = data.activity_tag.strip() or None
+        ensure_tag(db, post.circle_id, post.activity_tag)
     if data.album_id is not None:
         if data.album_id == 0:
             post.album_id = None

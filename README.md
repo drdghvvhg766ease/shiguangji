@@ -22,6 +22,11 @@
 
 **足迹地图**：纸感旅行手账风格，按月份展示真实记录，支持城市点位、省份高亮、日期顺序连线或从家分别出发的弧线轨迹。飞机沿线飞行，支持暂停与倍速、年份筛选和原记录查看；家的位置可搜索城市或填写经纬度，按账号保存在当前浏览器。发布和编辑时仍支持城市搜索与地图选点。
 
+足迹页只读取本地 `china-provinces.json`，运行时不请求在线瓦片、不需要地图密钥。
+
+> 说明：曾经尝试过的 three.js 三维沙盘已下线，代码保留在 `components/FootprintTerrain3D.vue` 与 `utils/china3d.js`（当前无引用、不参与打包），需要时可重新接入。
+
+
 ![足迹地图](./docs/screenshots/footprints.png)
 
 **管理端**：查看平台统计、处理举报、管理用户与朋友圈，并保留管理操作记录。
@@ -37,11 +42,20 @@
 | 账号与个人主页 | 注册 / 登录、头像裁剪、昵称与密码设置、个人操作时间线、消息中心 |
 | 私密朋友圈 | 创建与切换圈子、邀请码加入、入圈审核、圈主 / 管理员 / 成员角色、公告、转让与解散 |
 | 照片与视频记录 | 照片排序、真实上传进度、标签与生活日期、内容编辑、原文件下载、视频播放与 Range 拖动 |
+| 活动标签管理 | 圈子自维护标签表，圈子成员都能新增、改名、删除；改名同步圈内所有记录，删除后记录归到默认标签；发布与编辑时可直接选或自定义新标签 |
+| 语音记录 | 浏览器麦克风录制或上传音频、波形进度条播放/拖动、随记录一起发布（每条最多一段，20 MB / 10 分钟） |
 | 生活时间线 | 汇总主线、多级分支、年份筛选、照片胶片导航、随机回忆、操作历史保留 |
+| 一起玩 | 回忆盲盒（优先往年今日）、圈友共同任务与打卡、年度 / 月度回顾报告、猜照片计分赛（倒计时、积分榜、提示卡） |
+| 主题装扮 | 5 套预设主题（暗夜 / 樱花 / 海盐 / 松烟 / 金穗）+ 自定义配色，按账号保存并跨设备同步 |
 | 共同相册与主题分册 | 按成员 / 月份 / 标签筛选、拼贴封面、接力题目、关联时间线、猜照片 |
 | 足迹地图 | 本地中国省界、城市打点与省份高亮、按月旅程、日期顺序 / 从家出发两种连线、飞机流动动画、暂停 / 倍速、缩放 / 拖动、城市搜索与地点编辑 |
+| 全局搜索 | 跨圈搜索记录文字、地点、标签与分册名，可按圈子、成员、日期范围、媒体类型筛选，关键字高亮，Ctrl / ⌘ + K 唤起 |
+| 数据备份 | 按圈子与时间范围打包 ZIP：原始照片 / 视频 / 语音 + 记录清单 CSV + records.json + README，后台打包、完成后下载，72 小时自动清理 |
+| 装到桌面 | PWA：manifest + Service Worker，可添加到手机主屏幕全屏打开，断网也能打开应用外壳（接口数据不缓存） |
 | 互动与收藏 | 点赞、评论与回复、分类收藏夹、向指定圈子分享收藏、消息已读 |
 | 平台管理 | 举报审核、账号停用 / 恢复、用户与圈子管理、操作审计、独立管理会话 |
+
+「装到桌面」需要 HTTPS 或 localhost 环境（浏览器限制），本机可用 `npm run build:user && cd user && npm run preview` 体验生产构建的安装提示。
 
 照片原文件按上传字节保存，下载可用 SHA-256 校验；媒体通过鉴权接口读取。删除分册或时间线保留原记录，删除朋友圈会清理圈内记录与媒体。记录和分册同时关联多条时间线的功能暂未实现。
 
@@ -155,7 +169,14 @@ npm run dev:admin
 .\.venv\Scripts\python.exe seed_admin.py
 ```
 
-`seed.py` 创建演示成员、朋友圈、分册和合成照片；`seed_admin.py` 创建管理账号和演示举报。管理端演示需要先执行 `seed_admin.py`。
+`seed.py` 创建演示成员、朋友圈、分册和演示照片；`seed_admin.py` 创建管理账号和演示举报。管理端演示需要先执行 `seed_admin.py`。
+
+`backend/uploads` 不随仓库提交，换机器或清理目录后演示照片会 404。此时在 `backend` 目录重建即可，脚本会用 `frontend/user/public/preview-assets` 里的原型照片按比例裁剪出各帖配图，并回写尺寸、缩略图与 SHA-256：
+
+```powershell
+.\.venv\Scripts\python.exe repair_demo_media.py           # 只补缺失文件
+.\.venv\Scripts\python.exe repair_demo_media.py --force   # 全部重建
+```
 
 | 账号 | 密码 | 用途 |
 | --- | --- | --- |
@@ -175,6 +196,10 @@ npm run dev:admin
 .\.venv\Scripts\python.exe migrate_lines.py
 .\.venv\Scripts\python.exe migrate_social.py
 .\.venv\Scripts\python.exe migrate_activity.py
+.\.venv\Scripts\python.exe migrate_theme.py
+.\.venv\Scripts\python.exe migrate_play.py
+.\.venv\Scripts\python.exe migrate_export.py
+.\.venv\Scripts\python.exe migrate_tags.py
 ```
 
 举报迁移会在 `backend/backups` 保存备份；操作历史迁移仅回填旧数据中可以确认的事件。详细记录见 [工作记录](./docs/2026-10-01-工作记录.md)。

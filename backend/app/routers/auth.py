@@ -2,13 +2,14 @@ from fastapi import APIRouter, Depends, HTTPException, Response, UploadFile, Fil
 from fastapi.responses import FileResponse
 from PIL import Image, ImageOps, UnidentifiedImageError
 import io
+import json
 import uuid
 from sqlalchemy.orm import Session
 
 from ..config import settings
 from ..database import get_db
 from ..models import User
-from ..schemas import LoginIn, RegisterIn, UserOut, ProfileUpdate, PasswordUpdate
+from ..schemas import LoginIn, RegisterIn, UserOut, ProfileUpdate, PasswordUpdate, ThemeUpdate
 from ..media_utils import absolute_from_upload, cleanup
 from ..security import (
     clear_auth_cookie,
@@ -70,6 +71,16 @@ def update_profile(data: ProfileUpdate, user: User = Depends(get_current_user), 
     if not data.nickname.strip():
         raise HTTPException(status_code=400, detail="昵称不能为空")
     user.nickname = data.nickname.strip()
+    db.commit()
+    return user
+
+
+@router.put("/theme", response_model=UserOut)
+def update_theme(data: ThemeUpdate, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """保存当前账号的主题偏好（预设名 + 可选自定义配色），换设备登录后同步。"""
+    user.theme_preference = json.dumps(
+        {"preset": data.preset, "custom": data.custom}, ensure_ascii=False
+    )
     db.commit()
     return user
 

@@ -139,6 +139,16 @@ def validate_video_file(path: Path, mime: str) -> float | None:
     return duration
 
 
+def validate_audio_file(path: Path, mime: str) -> float | None:
+    """音频：mime 白名单校验，ffprobe 可用时顺带探测时长。"""
+    if mime not in settings.audio_mime_types:
+        raise MediaError("仅支持 MP3 / M4A / AAC / WAV / WebM / OGG 音频")
+    duration = probe_video_duration(path)
+    if duration is not None and duration > settings.max_audio_seconds + 0.5:
+        raise MediaError(f"语音时长不能超过 {settings.max_audio_seconds // 60} 分钟")
+    return duration
+
+
 def unique_path(directory: Path, original_name: str, fallback_ext: str) -> Path:
     ext = _ext_from_name(original_name, fallback_ext)
     return directory / f"{uuid.uuid4().hex}{ext}"

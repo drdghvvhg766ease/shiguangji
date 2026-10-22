@@ -130,8 +130,8 @@ def get_media_file(
     cache = "private, max-age=300" if variant == "preview" else "private, max-age=0, must-revalidate"
     headers = {"Cache-Control": cache, "Accept-Ranges": "bytes"}
 
-    # videos support Range for seeking
-    if media.kind == "video" and variant == "original":
+    # videos / audios support Range for seeking
+    if media.kind in ("video", "audio") and variant == "original":
         resp = _stream_range(path, mime, request.headers.get("range") if request else None)
         resp.headers["Cache-Control"] = cache
         return resp

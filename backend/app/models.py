@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import date, datetime
 
 from sqlalchemy import (
+    BigInteger,
     Boolean,
     Date,
     DateTime,
@@ -31,6 +32,7 @@ class User(Base):
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False)
     status: Mapped[str] = mapped_column(String(16), default="active")  # active | suspended
     auth_version: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    theme_preference: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON: {"preset": str, "custom": dict|None}
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     memberships: Mapped[list[CircleMember]] = relationship(back_populates="user", cascade="all, delete-orphan")
@@ -52,6 +54,22 @@ class Circle(Base):
     members: Mapped[list[CircleMember]] = relationship(back_populates="circle", cascade="all, delete-orphan")
     albums: Mapped[list[Album]] = relationship(back_populates="circle", cascade="all, delete-orphan")
     posts: Mapped[list[Post]] = relationship(back_populates="circle", cascade="all, delete-orphan")
+    tags: Mapped[list[CircleTag]] = relationship(back_populates="circle", cascade="all, delete-orphan")
+
+
+class CircleTag(Base):
+    """圈子自定义的活动标签（记录分类），改名 / 删除会同步到已有记录。"""
+
+    __tablename__ = "circle_tags"
+    __table_args__ = (UniqueConstraint("circle_id", "name", name="uq_circle_tag"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    circle_id: Mapped[int] = mapped_column(ForeignKey("circles.id", ondelete="CASCADE"), nullable=False, index=True)
+    name: Mapped[str] = mapped_column(String(32), nullable=False)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    circle: Mapped[Circle] = relationship(back_populates="tags")
 
 
 class CircleMember(Base):
@@ -271,3 +289,89 @@ class AuditLog(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     admin: Mapped[User | None] = relationship()
+
+
+class Challenge(Base):
+    """圈内共同任务，例如「本月一起拍 10 张天空」。"""
+
+    __tablename__ = "challenges"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    circle_id: Mapped[int] = mapped_column(ForeignKey("circles.id", ondelete="CASCADE"), index=True)
+    title: Mapped[str] = mapped_column(String(80), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    tag: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    target_count: Mapped[int] = mapped_column(Integer, default=1)
+    start_date: Mapped[date] = mapped_column(Date)
+    end_date: Mapped[date] = mapped_column(Date)
+    created_by: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    creator: Mapped[User] = relationship()
+    checkins: Mapped[list[ChallengeCheckin]] = relationship(
+        back_populates="challenge", cascade="all, delete-orphan"
+    )
+
+
+class ChallengeCheckin(Base):
+    __tablename__ = "challenge_checkins"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    challenge_id: Mapped[int] = mapped_column(
+        ForeignKey("challenges.id", ondelete="CASCADE"), index=True
+    )
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    post_id: Mapped[int | None] = mapped_column(
+        ForeignKey("posts.id", ondelete="SET NULL"), nullable=True
+    )
+    note: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    challenge: Mapped[Challenge] = relationship(back_populates="checkins")
+    user: Mapped[User] = relationship()
+
+
+class GuessAttempt(Base):
+    """猜照片计分：记录每次作答，用于排行榜与提示卡消耗。"""
+
+    __tablename__ = "guess_attempts"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    album_id: Mapped[int] = mapped_column(
+        ForeignKey("albums.id", ondelete="CASCADE"), index=True
+    )
+    media_id: Mapped[int] = mapped_column(ForeignKey("media.id", ondelete="CASCADE"), index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    guessed_month: Mapped[int] = mapped_column(Integer)
+    correct: Mapped[bool] = mapped_column(Boolean, default=False)
+    points: Mapped[int] = mapped_column(Integer, default=0)
+    used_hint: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), index=True)
+
+    user: Mapped[User] = relationship()
+
+
+class ExportJob(Base):
+    """圈子数据导出任务：后台打包 ZIP，完成后由创建者下载。"""
+
+    __tablename__ = "export_jobs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    circle_id: Mapped[int] = mapped_column(ForeignKey("circles.id", ondelete="CASCADE"), index=True)
+    status: Mapped[str] = mapped_column(String(16), default="pending", server_default="pending")
+    scope_from: Mapped[date | None] = mapped_column(Date, nullable=True)
+    scope_to: Mapped[date | None] = mapped_column(Date, nullable=True)
+    file_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    file_path: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    file_size: Mapped[int] = mapped_column(BigInteger, default=0, server_default="0")
+    post_count: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    media_count: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    skipped_count: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    message: Mapped[str] = mapped_column(String(255), default="", server_default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), index=True)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    circle: Mapped[Circle] = relationship()
+    user: Mapped[User] = relationship()

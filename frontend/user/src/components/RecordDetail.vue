@@ -54,6 +54,11 @@
                 preload="metadata"
                 @error="mediaError = true"
               />
+              <AudioPlayer
+                v-else-if="media?.kind === 'audio'"
+                :media="media"
+                class="record-audio"
+              />
               <span v-else class="gallery-status">{{
                 media ? '无法在线播放，请下载原文件' : '文字记录'
               }}</span>
@@ -96,8 +101,20 @@
               <a
                 class="icon-button"
                 :href="media.download_url"
-                :title="media.kind === 'video' ? '下载原视频' : '导出原图'"
-                :aria-label="media.kind === 'video' ? '下载原视频' : '导出原图'"
+                :title="
+                  media.kind === 'video'
+                    ? '下载原视频'
+                    : media.kind === 'audio'
+                      ? '下载语音'
+                      : '导出原图'
+                "
+                :aria-label="
+                  media.kind === 'video'
+                    ? '下载原视频'
+                    : media.kind === 'audio'
+                      ? '下载语音'
+                      : '导出原图'
+                "
                 ><Download
               /></a>
             </div>
@@ -139,7 +156,11 @@
               ><label
                 >标签<input
                   v-model="editForm.activity_tag"
-                  maxlength="32" /></label
+                  list="record-tag-options"
+                  maxlength="20" />
+                <datalist id="record-tag-options">
+                  <option v-for="name in tagOptions" :key="name" :value="name" />
+                </datalist></label
               ><label
                 >主题分册<select
                   v-model="editForm.album_id"
@@ -330,6 +351,7 @@ import { useAuthStore } from '../stores/auth'
 import { activateDialog } from '../utils/dialog'
 import { confirmDialog } from '../utils/confirm'
 import MediaPreview from './MediaPreview.vue'
+import AudioPlayer from './AudioPlayer.vue'
 import FootprintMap from './FootprintMap.vue'
 import UserAvatar from './UserAvatar.vue'
 import FavoritePicker from './FavoritePicker.vue'
@@ -365,6 +387,7 @@ const favoriteOpen = ref(false),
 const editing = ref(false),
   lines = ref([]),
   albums = ref([]),
+  tagOptions = ref([]),
   editLocation = ref(null)
 const editForm = reactive({
   content: '',
@@ -559,12 +582,16 @@ function report() {
 }
 async function startEdit() {
   action(async () => {
-    const [l, a] = await Promise.all([
+    const [l, a, t] = await Promise.all([
       api.get(`/api/circles/${post.value.circle_id}/lines`),
       api.get(`/api/circles/${post.value.circle_id}/albums`),
+      api
+        .get(`/api/circles/${post.value.circle_id}/tags`)
+        .catch(() => ({ data: [] })),
     ])
     lines.value = l.data
     albums.value = a.data
+    tagOptions.value = t.data.map((tag) => tag.name)
     Object.assign(editForm, {
       content: post.value.content,
       event_date: post.value.event_date,
