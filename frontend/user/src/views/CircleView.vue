@@ -29,7 +29,15 @@
 
     <template v-if="current">
       <div class="circle-panel">
-        <span class="circle-icon">{{
+        <MemberAvatarStack
+          v-if="members.length"
+          :members="members"
+          :size="52"
+          :max="5"
+          :letter="(current.name || '圈').slice(0, 1)"
+          class="circle-stack"
+        />
+        <span v-else class="circle-icon">{{
           (current.name || '圈').slice(0, 1)
         }}</span>
         <div>
@@ -65,9 +73,11 @@
       </div>
       <div class="circle-members-grid">
         <div v-for="m in members" :key="m.user_id" class="circle-member">
-          <span class="avatar" :class="avatarClass(m.user_id)">{{
-            (m.nickname || '?').slice(0, 1)
-          }}</span>
+          <UserAvatar
+            :src="m.avatar"
+            :name="m.nickname || m.username"
+            :class="avatarClass(m.user_id)"
+          />
           <div>
             <strong>{{ m.nickname || m.username }}</strong>
             <small
@@ -289,6 +299,8 @@ import { useAuthStore } from '../stores/auth'
 import { confirmDialog } from '../utils/confirm'
 import CircleManagement from '../components/CircleManagement.vue'
 import CircleExport from '../components/CircleExport.vue'
+import MemberAvatarStack from '../components/MemberAvatarStack.vue'
+import UserAvatar from '../components/UserAvatar.vue'
 
 const auth = useAuthStore()
 defineEmits(['logout'])

@@ -11,12 +11,20 @@
       </a>
 
       <button class="circle-select" type="button" @click="go('circle')">
-        <span class="circle-icon">{{ circleChar }}</span>
+        <MemberAvatarStack
+          v-if="members.length"
+          :members="members"
+          :size="30"
+          :max="3"
+          :letter="circleChar"
+          class="circle-stack"
+        />
+        <span v-else class="circle-icon">{{ circleChar }}</span>
         <span class="circle-select-text">
           <strong>{{ auth.currentCircle?.name || '还没有圈子' }}</strong>
           <small>{{
             auth.currentCircle
-              ? `${auth.currentCircle.member_count} 位成员 · 私密圈子`
+              ? `${auth.currentCircle.member_count} 位成员`
               : '建立或加入一个圈子'
           }}</small>
         </span>
@@ -48,15 +56,14 @@
       <section class="sidebar-members">
         <h3>圈内成员</h3>
         <div class="avatar-row">
-          <span
+          <UserAvatar
             v-for="m in members.slice(0, 6)"
             :key="m.user_id"
-            class="avatar"
+            :src="m.avatar"
+            :name="m.nickname || m.username"
             :class="avatarClass(m.user_id)"
             :title="m.nickname || m.username"
-          >
-            {{ (m.nickname || m.username || '?').slice(0, 1) }}
-          </span>
+          />
         </div>
       </section>
 
@@ -262,9 +269,11 @@
             </h2>
             <div class="member-list">
               <div v-for="m in members" :key="m.user_id" class="member-line">
-                <span class="avatar" :class="avatarClass(m.user_id)">{{
-                  (m.nickname || '?').slice(0, 1)
-                }}</span>
+                <UserAvatar
+                  :src="m.avatar"
+                  :name="m.nickname || m.username"
+                  :class="avatarClass(m.user_id)"
+                />
                 <span>{{ m.nickname || m.username }}</span>
                 <small>{{
                   m.role === 'owner'
@@ -360,6 +369,7 @@ import PlayView from './views/PlayView.vue'
 import ProfileView from './views/ProfileView.vue'
 import RecordDetail from './components/RecordDetail.vue'
 import UserAvatar from './components/UserAvatar.vue'
+import MemberAvatarStack from './components/MemberAvatarStack.vue'
 import PwaInstall from './components/PwaInstall.vue'
 
 const GlobalSearch = defineAsyncComponent(() => import('./components/GlobalSearch.vue'))

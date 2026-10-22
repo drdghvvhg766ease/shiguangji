@@ -93,6 +93,10 @@ a:focus-visible {
 .circle-select {
   background: #f5f6f4;
 }
+/* 圈子头像 = 圈内成员头像集合 */
+.circle-select:hover .circle-stack .member-stack-face {
+  box-shadow: 0 2px 6px #2429271f;
+}
 .sidebar .side-label {
   margin-top: 26px;
 }
