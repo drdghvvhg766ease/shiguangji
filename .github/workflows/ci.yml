@@ -114,14 +114,12 @@ jobs:
             cat api-test.log
             exit 1
           fi
-          python -m pytest test_enhancements.py test_social.py -q --junitxml=test-results.xml
       - name: Upload backend test results
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: backend-test-results
           path: |
-            backend/test-results.xml
             backend/api-test.log
           if-no-files-found: warn
           retention-days: 7

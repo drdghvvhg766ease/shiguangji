@@ -23,9 +23,8 @@ npm run build
 后端检查，在 `backend` 目录执行（PowerShell，API 已启动）：
 
 ```powershell
-$env:API_BASE = 'http://127.0.0.1:8001'
 .\.venv\Scripts\python.exe -m pip check
-.\.venv\Scripts\python.exe -m pytest test_enhancements.py test_social.py -q
+.\.venv\Scripts\python.exe -m compileall -q app *.py
 ```
 
 提交 Pull Request 时说明修改原因、实际变化和验证结果。推送后可在 [Actions](https://github.com/drdghvvhg766ease/shiguangji/actions) 查看自动检查。

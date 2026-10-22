@@ -68,7 +68,7 @@
 | 后端 API | FastAPI、Pydantic、SQLAlchemy 2、JWT HttpOnly Cookie |
 | 数据库 | MySQL 8.4、utf8mb4、PyMySQL |
 | 媒体处理 | Pillow 缩略图、SHA-256、可选 FFmpeg / FFprobe 视频封面与时长检查 |
-| 测试与部署 | pytest、浏览器检查脚本、GitHub Actions、Nginx、systemd |
+| 部署 | GitHub Actions、Nginx、systemd |
 
 依赖与选型依据见 [TECH_SELECTION.md](./TECH_SELECTION.md)，地图数据出处见 [地图说明](./frontend/user/public/maps/README.md)。
 
@@ -218,41 +218,26 @@ shiguangji/
 │  ├─ requirements*.txt      Python 依赖
 │  ├─ migrate_*.py           数据迁移
 │  ├─ seed*.py               演示数据初始化
-│  ├─ test_*.py              API 集成测试
 │  └─ uploads/               本地媒体目录，不提交到 Git
 ├─ .github/workflows/        GitHub 自动检查
 ├─ deploy/                   Nginx、systemd 与部署说明
 ├─ docs/                     需求、工作记录与项目截图
 ├─ scripts/                  城市数据生成等辅助脚本
-├─ tests/                    浏览器检查与共享测试媒体
 ├─ CONTRIBUTING.md           开发与提交说明
 └─ start-dev.bat             Windows 一键启动
 ```
 
-## 测试与自动检查
-
-### 本地检查
+## 自动检查
 
 在 `frontend` 目录执行 `npm run build`，构建用户端与管理端；产物分别位于 `frontend/user/dist` 和 `frontend/admin/dist`。
 
-后端测试需要已启动的 API，以及完成 `seed.py`、`seed_admin.py` 初始化的测试数据库。在 `backend` 目录执行：
-
-```powershell
-$env:API_BASE = 'http://127.0.0.1:8001'
-.\.venv\Scripts\python.exe -m pytest test_enhancements.py test_social.py -q
-```
-
-测试会创建账号、朋友圈和媒体并执行清理，请指向独立测试数据库。覆盖登录会话隔离、权限、举报、时间线、媒体清理、视频 Range、个人设置、消息与收藏等流程。
-
-`tests/*.cjs` 提供额外的浏览器检查，需要安装 Playwright、Microsoft Edge，并启动用户端、管理端和 API。可通过 `PLAYWRIGHT_PATH` 指定已有 Playwright 模块位置；具体场景见 [工作记录](./docs/2026-10-01-工作记录.md)。
-
-### GitHub Actions
+后端可在 `backend` 目录执行 `python -m compileall -q app *.py` 检查语法，并确认 API 能正常启动。
 
 [CI 工作流](https://github.com/drdghvvhg766ease/shiguangji/actions/workflows/ci.yml) 在推送 `main`、提交面向 `main` 的 Pull Request 或手动触发时运行：
 
 - **前端构建**：按两套锁文件安装依赖，构建用户端与管理端，上传构建产物。
-- **后端测试**：启动独立 MySQL 8.4 服务，初始化测试账号，检查 Python 语法与依赖，执行现有 API 集成测试。
-- **结果保留**：上传测试报告与 API 日志，便于在 Actions 页面排查失败。
+- **后端检查**：启动 MySQL 8.4 服务，初始化数据库，检查 Python 语法与依赖，并确认 API 可正常启动。
+- **结果保留**：上传 API 日志，便于在 Actions 页面排查失败。
 
 ## 部署
 
